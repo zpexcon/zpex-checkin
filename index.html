@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>ZPEX 체크인</title>
+<style>
+  :root {
+    --zpex-red: #B40E22;
+    --zpex-charcoal: #414141;
+    --zpex-white: #FFFFFF;
+    --zpex-lightgray: #F5F5F5;
+    --zpex-bordergray: #D2D2D2;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--zpex-lightgray);
+    color: var(--zpex-charcoal);
+    display: flex;
+    justify-content: center;
+    padding: 24px 12px;
+  }
+  .card {
+    background: var(--zpex-white);
+    border: 1px solid var(--zpex-bordergray);
+    border-radius: 8px;
+    width: 100%;
+    max-width: 420px;
+    padding: 24px;
+  }
+  h1 {
+    font-size: 18px;
+    color: var(--zpex-red);
+    margin: 0 0 4px;
+  }
+  .sub {
+    font-size: 13px;
+    color: var(--zpex-charcoal);
+    opacity: 0.7;
+    margin: 0 0 20px;
+  }
+  label {
+    display: block;
+    font-size: 13px;
+    margin: 12px 0 4px;
+  }
+  input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid var(--zpex-bordergray);
+    border-radius: 6px;
+    font-size: 16px;
+  }
+  .action-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 16px;
+  }
+  /* 640px 기준 (조직 규칙 — 768px 사용 금지, Galaxy Z Fold 등 대응) */
+  @media (max-width: 640px) {
+    .action-row { flex-direction: column; }
+  }
+  button {
+    flex: 1;
+    padding: 12px;
+    border: none;
+    border-radius: 6px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  #btnCheckin { background: var(--zpex-red); color: var(--zpex-white); }
+  #btnCheckout { background: var(--zpex-charcoal); color: var(--zpex-white); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  #status {
+    margin-top: 16px;
+    padding: 12px;
+    border-radius: 6px;
+    font-size: 14px;
+    display: none;
+  }
+  #status.ok { background: #E8F5E9; color: #2E7D32; display: block; }
+  #status.err { background: #FDECEA; color: var(--zpex-red); display: block; }
+  #locNote { font-size: 12px; color: var(--zpex-charcoal); opacity: 0.6; margin-top: 8px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>ZPEX 현장 체크인</h1>
+  <p class="sub" id="projectLabel">프로젝트 확인 중...</p>
+
+  <label for="employeeId">사번 (Employee ID)</label>
+  <input id="employeeId" type="text" inputmode="text" autocomplete="off" placeholder="예: ZPX-001">
+
+  <label for="pin">PIN</label>
+  <input id="pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="••••">
+
+  <div class="action-row">
+    <button id="btnCheckin">체크인</button>
+    <button id="btnCheckout">체크아웃</button>
+  </div>
+
+  <div id="status"></div>
+  <p id="locNote">위치 확인 중...</p>
+</div>
+
+<script>
+  // ⚠ 배포 전 실제 F-05 Power Automate HTTP 트리거 URL로 교체 필요
+  const F05_ENDPOINT = "https://REPLACE_WITH_ACTUAL_FLOW_URL";
+
+  const params = new URLSearchParams(window.location.search);
+  const projectCode = params.get("projectCode") || "";
+  const siteLat = parseFloat(params.get("siteLat"));
+  const siteLng = parseFloat(params.get("siteLng"));
+
+  document.getElementById("projectLabel").textContent = projectCode
+    ? `현장 코드: ${projectCode}`
+    : "⚠ 프로젝트 코드가 없습니다. QR을 다시 스캔하세요.";
+
+  let currentPos = null;
+  const locNote = document.getElementById("locNote");
+  const statusBox = document.getElementById("status");
+  const btnCheckin = document.getElementById("btnCheckin");
+  const btnCheckout = document.getElementById("btnCheckout");
+
+  function setButtonsEnabled(enabled) {
+    btnCheckin.disabled = !enabled;
+    btnCheckout.disabled = !enabled;
+  }
+  setButtonsEnabled(false);
+
+  // Haversine 거리 계산 (미터 단위) — 클라이언트 1차 확인용, 서버(F-05)에서 2차 검증
+  function haversineMeters(lat1, lng1, lat2, lng2) {
+    const R = 6371000;
+    const toRad = deg => deg * Math.PI / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLng = toRad(lng2 - lng1);
+    const a = Math.sin(dLat / 2) ** 2 +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+
+  function showStatus(message, ok) {
+    statusBox.textContent = message;
+    statusBox.className = ok ? "ok" : "err";
+  }
+
+  if (!navigator.geolocation) {
+    locNote.textContent = "이 브라우저는 위치 확인을 지원하지 않습니다.";
+  } else {
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        currentPos = pos.coords;
+        if (!isNaN(siteLat) && !isNaN(siteLng)) {
+          const dist = haversineMeters(currentPos.latitude, currentPos.longitude, siteLat, siteLng);
+          if (dist <= 200) {
+            locNote.textContent = `현장 반경 내 확인됨 (약 ${Math.round(dist)}m)`;
+            setButtonsEnabled(true);
+          } else {
+            locNote.textContent = `⚠ 현장에서 약 ${Math.round(dist)}m 떨어져 있습니다. 현장 근처에서 다시 시도하세요.`;
+            setButtonsEnabled(false);
+          }
+        } else {
+          locNote.textContent = "위치 확인됨 (현장 좌표 정보 없음 — 서버에서 검증)";
+          setButtonsEnabled(true);
+        }
+      },
+      () => {
+        locNote.textContent = "⚠ 위치 확인 실패. 위치 접근 권한을 허용해주세요.";
+        setButtonsEnabled(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  }
+
+  async function submitCheck(action) {
+    const employeeId = document.getElementById("employeeId").value.trim();
+    const pin = document.getElementById("pin").value.trim();
+
+    if (!employeeId || !pin) {
+      showStatus("사번과 PIN을 모두 입력하세요.", false);
+      return;
+    }
+    if (!currentPos) {
+      showStatus("위치 확인이 완료된 후 시도하세요.", false);
+      return;
+    }
+
+    setButtonsEnabled(false);
+    showStatus("처리 중...", true);
+
+    try {
+      const res = await fetch(F05_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          employeeId,
+          pin,
+          projectCode,
+          action,
+          lat: currentPos.latitude,
+          lng: currentPos.longitude
+        })
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        const label = action === "checkin" ? "체크인" : "체크아웃";
+        showStatus(`${label} 완료: ${data.workerName || employeeId}${data.isLate ? " (지각)" : ""}`, true);
+      } else {
+        showStatus(`실패: ${translateReason(data.reason)}`, false);
+      }
+    } catch (e) {
+      showStatus("네트워크 오류. 다시 시도하세요.", false);
+    } finally {
+      setButtonsEnabled(true);
+    }
+  }
+
+  function translateReason(reason) {
+    const map = {
+      not_found: "등록되지 않은 사번입니다.",
+      locked: "계정이 잠금되었습니다. 관리자에게 문의하세요.",
+      pin_mismatch: "PIN이 일치하지 않습니다.",
+      wrong_project: "이 현장에 배정된 작업자가 아닙니다.",
+      out_of_range: "현장 범위를 벗어났습니다.",
+      already_checked_in: "이미 체크인되었습니다.",
+      not_checked_in: "체크인 기록이 없습니다."
+    };
+    return map[reason] || reason || "알 수 없는 오류";
+  }
+
+  btnCheckin.addEventListener("click", () => submitCheck("checkin"));
+  btnCheckout.addEventListener("click", () => submitCheck("checkout"));
+</script>
+</body>
+</html>
