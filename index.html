@@ -30,10 +30,26 @@
     max-width: 420px;
     padding: 24px;
   }
+  .header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
   h1 {
     font-size: 18px;
     color: var(--zpex-red);
     margin: 0 0 4px;
+  }
+  .lang-btn {
+    flex: none;
+    padding: 4px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    border: 1px solid var(--zpex-bordergray);
+    border-radius: 4px;
+    background: var(--zpex-white);
+    color: var(--zpex-charcoal);
+    cursor: pointer;
   }
   .sub {
     font-size: 13px;
@@ -89,10 +105,13 @@
 </head>
 <body>
 <div class="card">
-  <h1>ZPEX 현장 체크인</h1>
+  <div class="header-row">
+    <h1 id="pageTitle">ZPEX 현장 체크인</h1>
+    <button id="langToggle" type="button" class="lang-btn">EN</button>
+  </div>
   <p class="sub" id="projectLabel">프로젝트 확인 중...</p>
 
-  <label for="employeeId">사번 (Employee ID)</label>
+  <label for="employeeId" id="employeeIdLabel">사번 (Employee ID)</label>
   <input id="employeeId" name="employeeId" type="text" inputmode="text" autocomplete="username" placeholder="예: ZPX-001">
   <div id="nameConfirm"></div>
 
@@ -111,6 +130,80 @@
 <script>
   const F05_ENDPOINT = "https://default3c1ae8a05e88491d86c07db19e932c.6d.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/20/workflows/d9257750b2074539855daf89f2d08bad/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=Pg6qPzXSXVvhbL17J7t1KyM0cPav8EhZcDx-HeL9JZc";
   const F05B_ENDPOINT = "https://default3c1ae8a05e88491d86c07db19e932c.6d.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/05/workflows/a40dc018003142799d04d75a7f6b94b8/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=56djoOif5XIICI8L4fmDAIdY3eFqe-2sgeNZvFBGuVU";
+
+  // 한/영 번역 사전
+  const translations = {
+    ko: {
+      pageTitle: "ZPEX 현장 체크인",
+      toggleLabel: "EN",
+      employeeIdLabel: "사번 (Employee ID)",
+      employeeIdPlaceholder: "예: ZPX-001",
+      btnCheckin: "체크인",
+      btnCheckout: "체크아웃",
+      projectWithCode: (code) => `현장 코드: ${code}`,
+      projectNoCode: "⚠ 프로젝트 코드가 없습니다. QR을 다시 스캔하세요.",
+      locChecking: "위치 확인 중...",
+      locNotSupported: "이 브라우저는 위치 확인을 지원하지 않습니다.",
+      locInRange: (m) => `현장 반경 내 확인됨 (약 ${m}m)`,
+      locOutOfRange: (m) => `⚠ 현장에서 약 ${m}m 떨어져 있습니다. 현장 근처에서 다시 시도하세요.`,
+      locNoSiteCoord: "위치 확인됨 (현장 좌표 정보 없음 — 서버에서 검증)",
+      locFailed: "⚠ 위치 확인 실패. 위치 접근 권한을 허용해주세요.",
+      needBoth: "사번과 PIN을 모두 입력하세요.",
+      needLocation: "위치 확인이 완료된 후 시도하세요.",
+      processing: "처리 중...",
+      workerNotFound: "실패: 등록되지 않은 사번입니다.",
+      networkError: "네트워크 오류. 다시 시도하세요.",
+      doneCheckin: "체크인 완료",
+      doneCheckout: "체크아웃 완료",
+      late: " (지각)",
+      unknownError: "알 수 없는 오류",
+      reasons: {
+        not_found: "등록되지 않은 사번입니다.",
+        locked: "계정이 잠금되었습니다. 관리자에게 문의하세요.",
+        pin_mismatch: "PIN이 일치하지 않습니다.",
+        wrong_project: "이 현장에 배정된 작업자가 아닙니다.",
+        out_of_range: "현장 범위를 벗어났습니다.",
+        already_checked_in: "이미 체크인되었습니다.",
+        not_checked_in: "체크인 기록이 없습니다."
+      }
+    },
+    en: {
+      pageTitle: "ZPEX Site Check-In",
+      toggleLabel: "한국어",
+      employeeIdLabel: "Employee ID",
+      employeeIdPlaceholder: "e.g. ZPX-001",
+      btnCheckin: "Check In",
+      btnCheckout: "Check Out",
+      projectWithCode: (code) => `Site Code: ${code}`,
+      projectNoCode: "⚠ No project code found. Please rescan the QR code.",
+      locChecking: "Checking location...",
+      locNotSupported: "This browser does not support location services.",
+      locInRange: (m) => `Within site range (approx. ${m}m)`,
+      locOutOfRange: (m) => `⚠ You are approximately ${m}m from the site. Please try again near the site.`,
+      locNoSiteCoord: "Location confirmed (no site coordinates set — verified on server)",
+      locFailed: "⚠ Location check failed. Please allow location access.",
+      needBoth: "Please enter both Employee ID and PIN.",
+      needLocation: "Please wait for location confirmation.",
+      processing: "Processing...",
+      workerNotFound: "Failed: Employee ID not found.",
+      networkError: "Network error. Please try again.",
+      doneCheckin: "Check-in completed",
+      doneCheckout: "Check-out completed",
+      late: " (Late)",
+      unknownError: "Unknown error",
+      reasons: {
+        not_found: "Employee ID not found.",
+        locked: "Account locked. Please contact your administrator.",
+        pin_mismatch: "PIN does not match.",
+        wrong_project: "Not assigned to this project.",
+        out_of_range: "Outside site range.",
+        already_checked_in: "Already checked in.",
+        not_checked_in: "No check-in record found."
+      }
+    }
+  };
+
+  let currentLang = localStorage.getItem("zpexCheckinLang") || "ko";
 
   async function lookupWorker(employeeId) {
     const res = await fetch(F05B_ENDPOINT, {
@@ -133,15 +226,17 @@
   const siteLat = parseFloat(params.get("siteLat"));
   const siteLng = parseFloat(params.get("siteLng"));
 
-  document.getElementById("projectLabel").textContent = projectCode
-    ? `현장 코드: ${projectCode}`
-    : "⚠ 프로젝트 코드가 없습니다. QR을 다시 스캔하세요.";
-
+  const pageTitleEl = document.getElementById("pageTitle");
+  const langToggleBtn = document.getElementById("langToggle");
+  const projectLabelEl = document.getElementById("projectLabel");
+  const employeeIdLabelEl = document.getElementById("employeeIdLabel");
   let currentPos = null;
   const locNote = document.getElementById("locNote");
   const statusBox = document.getElementById("status");
   const btnCheckin = document.getElementById("btnCheckin");
   const btnCheckout = document.getElementById("btnCheckout");
+  const employeeIdInput = document.getElementById("employeeId");
+  const nameConfirm = document.getElementById("nameConfirm");
 
   function setButtonsEnabled(enabled) {
     btnCheckin.disabled = !enabled;
@@ -149,9 +244,45 @@
   }
   setButtonsEnabled(false);
 
+  // 위치 상태(문구 재조합용) — 언어 전환 시 현재 상태 그대로 다시 렌더링하기 위함
+  let locState = { type: "checking", dist: null };
+  function renderLocNote() {
+    const t = translations[currentLang];
+    switch (locState.type) {
+      case "notSupported": locNote.textContent = t.locNotSupported; break;
+      case "inRange": locNote.textContent = t.locInRange(locState.dist); break;
+      case "outOfRange": locNote.textContent = t.locOutOfRange(locState.dist); break;
+      case "noSiteCoord": locNote.textContent = t.locNoSiteCoord; break;
+      case "failed": locNote.textContent = t.locFailed; break;
+      default: locNote.textContent = t.locChecking;
+    }
+  }
+
+  function renderProjectLabel() {
+    const t = translations[currentLang];
+    projectLabelEl.textContent = projectCode ? t.projectWithCode(projectCode) : t.projectNoCode;
+  }
+
+  function applyLanguage() {
+    const t = translations[currentLang];
+    pageTitleEl.textContent = t.pageTitle;
+    langToggleBtn.textContent = t.toggleLabel;
+    employeeIdLabelEl.textContent = t.employeeIdLabel;
+    employeeIdInput.placeholder = t.employeeIdPlaceholder;
+    btnCheckin.textContent = t.btnCheckin;
+    btnCheckout.textContent = t.btnCheckout;
+    renderProjectLabel();
+    renderLocNote();
+  }
+  applyLanguage();
+
+  langToggleBtn.addEventListener("click", () => {
+    currentLang = currentLang === "ko" ? "en" : "ko";
+    localStorage.setItem("zpexCheckinLang", currentLang);
+    applyLanguage();
+  });
+
   // 사번 입력 시 이름 실시간 표시 (오타로 다른 사람 계정 입력하는 실수 방지)
-  const employeeIdInput = document.getElementById("employeeId");
-  const nameConfirm = document.getElementById("nameConfirm");
   let lookupTimer = null;
   employeeIdInput.addEventListener("input", () => {
     const val = employeeIdInput.value.trim();
@@ -182,7 +313,8 @@
   }
 
   if (!navigator.geolocation) {
-    locNote.textContent = "이 브라우저는 위치 확인을 지원하지 않습니다.";
+    locState = { type: "notSupported", dist: null };
+    renderLocNote();
   } else {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
@@ -190,19 +322,21 @@
         if (!isNaN(siteLat) && !isNaN(siteLng)) {
           const dist = haversineMeters(currentPos.latitude, currentPos.longitude, siteLat, siteLng);
           if (dist <= 200) {
-            locNote.textContent = `현장 반경 내 확인됨 (약 ${Math.round(dist)}m)`;
+            locState = { type: "inRange", dist: Math.round(dist) };
             setButtonsEnabled(true);
           } else {
-            locNote.textContent = `⚠ 현장에서 약 ${Math.round(dist)}m 떨어져 있습니다. 현장 근처에서 다시 시도하세요.`;
+            locState = { type: "outOfRange", dist: Math.round(dist) };
             setButtonsEnabled(false);
           }
         } else {
-          locNote.textContent = "위치 확인됨 (현장 좌표 정보 없음 — 서버에서 검증)";
+          locState = { type: "noSiteCoord", dist: null };
           setButtonsEnabled(true);
         }
+        renderLocNote();
       },
       () => {
-        locNote.textContent = "⚠ 위치 확인 실패. 위치 접근 권한을 허용해주세요.";
+        locState = { type: "failed", dist: null };
+        renderLocNote();
         setButtonsEnabled(false);
       },
       { enableHighAccuracy: true, timeout: 10000 }
@@ -210,25 +344,26 @@
   }
 
   async function submitCheck(action) {
+    const t = translations[currentLang];
     const employeeId = document.getElementById("employeeId").value.trim();
     const pin = document.getElementById("pin").value.trim();
 
     if (!employeeId || !pin) {
-      showStatus("사번과 PIN을 모두 입력하세요.", false);
+      showStatus(t.needBoth, false);
       return;
     }
     if (!currentPos) {
-      showStatus("위치 확인이 완료된 후 시도하세요.", false);
+      showStatus(t.needLocation, false);
       return;
     }
 
     setButtonsEnabled(false);
-    showStatus("처리 중...", true);
+    showStatus(t.processing, true);
 
     try {
       const worker = await lookupWorker(employeeId);
       if (!worker) {
-        showStatus("실패: 등록되지 않은 사번입니다.", false);
+        showStatus(t.workerNotFound, false);
         setButtonsEnabled(true);
         return;
       }
@@ -249,29 +384,21 @@
       const data = await res.json();
 
       if (data.success) {
-        const label = action === "checkin" ? "체크인" : "체크아웃";
-        showStatus(`${label} 완료: ${data.workerName || employeeId}${data.isLate ? " (지각)" : ""}`, true);
+        const label = action === "checkin" ? t.doneCheckin : t.doneCheckout;
+        showStatus(`${label}: ${data.workerName || employeeId}${data.isLate ? t.late : ""}`, true);
       } else {
         showStatus(translateReason(data.reason), false);
       }
     } catch (e) {
-      showStatus("네트워크 오류. 다시 시도하세요.", false);
+      showStatus(t.networkError, false);
     } finally {
       setButtonsEnabled(true);
     }
   }
 
   function translateReason(reason) {
-    const map = {
-      not_found: "등록되지 않은 사번입니다.",
-      locked: "계정이 잠금되었습니다. 관리자에게 문의하세요.",
-      pin_mismatch: "PIN이 일치하지 않습니다.",
-      wrong_project: "이 현장에 배정된 작업자가 아닙니다.",
-      out_of_range: "현장 범위를 벗어났습니다.",
-      already_checked_in: "이미 체크인되었습니다.",
-      not_checked_in: "체크인 기록이 없습니다."
-    };
-    return map[reason] || reason || "알 수 없는 오류";
+    const t = translations[currentLang];
+    return t.reasons[reason] || reason || t.unknownError;
   }
 
   btnCheckin.addEventListener("click", () => submitCheck("checkin"));
