@@ -285,6 +285,11 @@
   // 사번 입력 시 이름 실시간 표시 (오타로 다른 사람 계정 입력하는 실수 방지)
   let lookupTimer = null;
   employeeIdInput.addEventListener("input", () => {
+    const selStart = employeeIdInput.selectionStart;
+    const selEnd = employeeIdInput.selectionEnd;
+    employeeIdInput.value = employeeIdInput.value.toUpperCase();
+    employeeIdInput.setSelectionRange(selStart, selEnd);
+
     const val = employeeIdInput.value.trim();
     nameConfirm.textContent = "";
     clearTimeout(lookupTimer);
