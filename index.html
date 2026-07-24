@@ -252,7 +252,7 @@
         const label = action === "checkin" ? "체크인" : "체크아웃";
         showStatus(`${label} 완료: ${data.workerName || employeeId}${data.isLate ? " (지각)" : ""}`, true);
       } else {
-        showStatus(`실패: ${translateReason(data.reason)}`, false);
+        showStatus(translateReason(data.reason), false);
       }
     } catch (e) {
       showStatus("네트워크 오류. 다시 시도하세요.", false);
