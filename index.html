@@ -107,8 +107,24 @@
 </div>
 
 <script>
-  // ⚠ 배포 전 실제 F-05 Power Automate HTTP 트리거 URL로 교체 필요
-  const F05_ENDPOINT = "https://REPLACE_WITH_ACTUAL_FLOW_URL";
+  const F05_ENDPOINT = "https://default3c1ae8a05e88491d86c07db19e932c.6d.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/20/workflows/d9257750b2074539855daf89f2d08bad/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=Pg6qPzXSXVvhbL17J7t1KyM0cPav8EhZcDx-HeL9JZc";
+  const F05B_ENDPOINT = "https://default3c1ae8a05e88491d86c07db19e932c.6d.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/05/workflows/a40dc018003142799d04d75a7f6b94b8/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=56djoOif5XIICI8L4fmDAIdY3eFqe-2sgeNZvFBGuVU";
+
+  async function getSalt(employeeId) {
+    const res = await fetch(F05B_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ employeeId })
+    });
+    const data = await res.json();
+    if (!data.success) return null;
+    return data.salt;
+  }
+
+  async function hashPin(pin, salt) {
+    const buffer = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(pin + salt));
+    return Array.from(new Uint8Array(buffer)).map(b => b.toString(16).padStart(2, "0")).join("");
+  }
 
   const params = new URLSearchParams(window.location.search);
   const projectCode = params.get("projectCode") || "";
@@ -192,12 +208,20 @@
     showStatus("처리 중...", true);
 
     try {
+      const salt = await getSalt(employeeId);
+      if (!salt) {
+        showStatus("실패: 등록되지 않은 사번입니다.", false);
+        setButtonsEnabled(true);
+        return;
+      }
+      const pinHash = await hashPin(pin, salt);
+
       const res = await fetch(F05_ENDPOINT, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           employeeId,
-          pin,
+          pinHash,
           projectCode,
           action,
           lat: currentPos.latitude,
