@@ -84,6 +84,7 @@
   #status.ok { background: #E8F5E9; color: #2E7D32; display: block; }
   #status.err { background: #FDECEA; color: var(--zpex-red); display: block; }
   #locNote { font-size: 12px; color: var(--zpex-charcoal); opacity: 0.6; margin-top: 8px; }
+  #nameConfirm { font-size: 20px; font-weight: 700; color: var(--zpex-red); min-height: 26px; margin-top: 2px; }
 </style>
 </head>
 <body>
@@ -92,7 +93,8 @@
   <p class="sub" id="projectLabel">프로젝트 확인 중...</p>
 
   <label for="employeeId">사번 (Employee ID)</label>
-  <input id="employeeId" type="text" inputmode="text" autocomplete="off" placeholder="예: ZPX-001">
+  <input id="employeeId" name="employeeId" type="text" inputmode="text" autocomplete="username" placeholder="예: ZPX-001">
+  <div id="nameConfirm"></div>
 
   <label for="pin">PIN</label>
   <input id="pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="••••">
@@ -110,7 +112,7 @@
   const F05_ENDPOINT = "https://default3c1ae8a05e88491d86c07db19e932c.6d.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/20/workflows/d9257750b2074539855daf89f2d08bad/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=Pg6qPzXSXVvhbL17J7t1KyM0cPav8EhZcDx-HeL9JZc";
   const F05B_ENDPOINT = "https://default3c1ae8a05e88491d86c07db19e932c.6d.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/05/workflows/a40dc018003142799d04d75a7f6b94b8/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=56djoOif5XIICI8L4fmDAIdY3eFqe-2sgeNZvFBGuVU";
 
-  async function getSalt(employeeId) {
+  async function lookupWorker(employeeId) {
     const res = await fetch(F05B_ENDPOINT, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -118,7 +120,7 @@
     });
     const data = await res.json();
     if (!data.success) return null;
-    return data.salt;
+    return { salt: data.salt, name: data.name };
   }
 
   async function hashPin(pin, salt) {
@@ -146,6 +148,22 @@
     btnCheckout.disabled = !enabled;
   }
   setButtonsEnabled(false);
+
+  // 사번 입력 시 이름 실시간 표시 (오타로 다른 사람 계정 입력하는 실수 방지)
+  const employeeIdInput = document.getElementById("employeeId");
+  const nameConfirm = document.getElementById("nameConfirm");
+  let lookupTimer = null;
+  employeeIdInput.addEventListener("input", () => {
+    const val = employeeIdInput.value.trim();
+    nameConfirm.textContent = "";
+    clearTimeout(lookupTimer);
+    if (val.length < 3) return;
+    lookupTimer = setTimeout(async () => {
+      const worker = await lookupWorker(val);
+      if (employeeIdInput.value.trim() !== val) return; // 그 사이 값이 바뀌었으면 무시
+      nameConfirm.textContent = worker ? worker.name : "";
+    }, 500);
+  });
 
   // Haversine 거리 계산 (미터 단위) — 클라이언트 1차 확인용, 서버(F-05)에서 2차 검증
   function haversineMeters(lat1, lng1, lat2, lng2) {
@@ -208,13 +226,13 @@
     showStatus("처리 중...", true);
 
     try {
-      const salt = await getSalt(employeeId);
-      if (!salt) {
+      const worker = await lookupWorker(employeeId);
+      if (!worker) {
         showStatus("실패: 등록되지 않은 사번입니다.", false);
         setButtonsEnabled(true);
         return;
       }
-      const pinHash = await hashPin(pin, salt);
+      const pinHash = await hashPin(pin, worker.salt);
 
       const res = await fetch(F05_ENDPOINT, {
         method: "POST",
