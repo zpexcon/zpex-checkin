@@ -89,18 +89,32 @@
   }
   #btnCheckin { background: var(--zpex-red); color: var(--zpex-white); }
   #btnCheckout { background: var(--zpex-charcoal); color: var(--zpex-white); }
+  #btnRegister { background: var(--zpex-red); color: var(--zpex-white); }
   button:disabled { opacity: 0.5; cursor: not-allowed; }
-  #status {
+  .status-box {
     margin-top: 16px;
     padding: 12px;
     border-radius: 6px;
     font-size: 14px;
     display: none;
   }
-  #status.ok { background: #E8F5E9; color: #2E7D32; display: block; }
-  #status.err { background: #FDECEA; color: var(--zpex-red); display: block; }
+  .status-box.ok { background: #E8F5E9; color: #2E7D32; display: block; }
+  .status-box.err { background: #FDECEA; color: var(--zpex-red); display: block; }
   #locNote { font-size: 12px; color: var(--zpex-charcoal); opacity: 0.6; margin-top: 8px; }
   #nameConfirm { font-size: 20px; font-weight: 700; color: var(--zpex-charcoal); min-height: 26px; margin-top: 2px; }
+  .link-btn {
+    display: block;
+    width: 100%;
+    margin-top: 16px;
+    padding: 8px;
+    background: none;
+    border: none;
+    color: var(--zpex-charcoal);
+    font-size: 13px;
+    font-weight: 400;
+    text-decoration: underline;
+    cursor: pointer;
+  }
 </style>
 </head>
 <body>
@@ -111,25 +125,44 @@
   </div>
   <p class="sub" id="projectLabel">프로젝트 확인 중...</p>
 
-  <label for="employeeId" id="employeeIdLabel">사번 (Employee ID)</label>
-  <input id="employeeId" name="employeeId" type="text" inputmode="text" autocomplete="username" placeholder="예: ZPX-001">
-  <div id="nameConfirm"></div>
+  <div id="checkinView">
+    <label for="employeeId" id="employeeIdLabel">사번 (Employee ID)</label>
+    <input id="employeeId" name="employeeId" type="text" inputmode="text" autocomplete="username" placeholder="예: ZPX-001">
+    <div id="nameConfirm"></div>
 
-  <label for="pin">PIN</label>
-  <input id="pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="••••">
+    <label for="pin">PIN</label>
+    <input id="pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="••••">
 
-  <div class="action-row">
-    <button id="btnCheckin">체크인</button>
-    <button id="btnCheckout">체크아웃</button>
+    <div class="action-row">
+      <button id="btnCheckin">체크인</button>
+      <button id="btnCheckout">체크아웃</button>
+    </div>
+
+    <div id="status" class="status-box"></div>
+    <p id="locNote">위치 확인 중...</p>
   </div>
 
-  <div id="status"></div>
-  <p id="locNote">위치 확인 중...</p>
+  <div id="registerView" style="display:none;">
+    <label for="regName" id="regNameLabel">이름 (Name)</label>
+    <input id="regName" type="text" placeholder="예: 홍길동">
+
+    <label for="regPin" id="regPinLabel">PIN 설정 (4~6자리 숫자)</label>
+    <input id="regPin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="••••">
+
+    <div class="action-row">
+      <button id="btnRegister">등록</button>
+    </div>
+
+    <div id="registerStatus" class="status-box"></div>
+  </div>
+
+  <button id="modeToggle" type="button" class="link-btn">신규 등록</button>
 </div>
 
 <script>
   const F05_ENDPOINT = "https://default3c1ae8a05e88491d86c07db19e932c.6d.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/20/workflows/d9257750b2074539855daf89f2d08bad/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=Pg6qPzXSXVvhbL17J7t1KyM0cPav8EhZcDx-HeL9JZc";
   const F05B_ENDPOINT = "https://default3c1ae8a05e88491d86c07db19e932c.6d.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/05/workflows/a40dc018003142799d04d75a7f6b94b8/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=56djoOif5XIICI8L4fmDAIdY3eFqe-2sgeNZvFBGuVU";
+  const F21_ENDPOINT = "https://REPLACE_WITH_F21_FLOW_URL"; // F-21_Worker_SelfRegister 플로우 생성/게시 후 이 URL로 교체 필요
 
   // 한/영 번역 사전
   const translations = {
@@ -157,6 +190,16 @@
       doneCheckout: "체크아웃 완료",
       late: " (지각)",
       unknownError: "알 수 없는 오류",
+      registerLink: "신규 등록",
+      backToCheckin: "← 체크인으로 돌아가기",
+      nameLabel: "이름 (Name)",
+      namePlaceholder: "예: 홍길동",
+      pinSetupLabel: "PIN 설정 (4~6자리 숫자)",
+      btnRegister: "등록",
+      needNameAndPin: "이름과 PIN을 모두 입력하세요.",
+      invalidPin: "PIN은 4~6자리 숫자여야 합니다.",
+      registering: "등록 처리 중...",
+      registerSuccess: (id) => `등록 완료! 사번: ${id} — 이 번호와 PIN으로 체크인하세요.`,
       reasons: {
         not_found: "등록되지 않은 사번입니다.",
         locked: "계정이 잠금되었습니다. 관리자에게 문의하세요.",
@@ -164,7 +207,8 @@
         wrong_project: "이 현장에 배정된 작업자가 아닙니다.",
         out_of_range: "현장 범위를 벗어났습니다.",
         already_checked_in: "이미 체크인되었습니다.",
-        not_checked_in: "체크인 기록이 없습니다."
+        not_checked_in: "체크인 기록이 없습니다.",
+        project_not_found: "현장 코드를 확인할 수 없습니다. QR을 다시 스캔하세요."
       }
     },
     en: {
@@ -191,6 +235,16 @@
       doneCheckout: "Check-out completed",
       late: " (Late)",
       unknownError: "Unknown error",
+      registerLink: "New Registration",
+      backToCheckin: "← Back to Check-In",
+      nameLabel: "Name",
+      namePlaceholder: "e.g. John Doe",
+      pinSetupLabel: "Set PIN (4-6 digits)",
+      btnRegister: "Register",
+      needNameAndPin: "Please enter both name and PIN.",
+      invalidPin: "PIN must be 4-6 digits.",
+      registering: "Registering...",
+      registerSuccess: (id) => `Registration complete! Employee ID: ${id} — use this ID and PIN to check in.`,
       reasons: {
         not_found: "Employee ID not found.",
         locked: "Account locked. Please contact your administrator.",
@@ -198,12 +252,14 @@
         wrong_project: "Not assigned to this project.",
         out_of_range: "Outside site range.",
         already_checked_in: "Already checked in.",
-        not_checked_in: "No check-in record found."
+        not_checked_in: "No check-in record found.",
+        project_not_found: "Project not found. Please rescan the QR code."
       }
     }
   };
 
   let currentLang = localStorage.getItem("zpexCheckinLang") || "ko";
+  let currentView = "checkin";
 
   async function lookupWorker(employeeId) {
     const res = await fetch(F05B_ENDPOINT, {
@@ -219,6 +275,11 @@
   async function hashPin(pin, salt) {
     const buffer = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(pin + salt));
     return Array.from(new Uint8Array(buffer)).map(b => b.toString(16).padStart(2, "0")).join("");
+  }
+
+  async function generateSalt() {
+    const bytes = crypto.getRandomValues(new Uint8Array(16));
+    return Array.from(bytes).map(b => b.toString(16).padStart(2, "0")).join("");
   }
 
   const params = new URLSearchParams(window.location.search);
@@ -237,6 +298,16 @@
   const btnCheckout = document.getElementById("btnCheckout");
   const employeeIdInput = document.getElementById("employeeId");
   const nameConfirm = document.getElementById("nameConfirm");
+
+  const checkinView = document.getElementById("checkinView");
+  const registerView = document.getElementById("registerView");
+  const modeToggleBtn = document.getElementById("modeToggle");
+  const regNameLabelEl = document.getElementById("regNameLabel");
+  const regPinLabelEl = document.getElementById("regPinLabel");
+  const regNameInput = document.getElementById("regName");
+  const regPinInput = document.getElementById("regPin");
+  const btnRegister = document.getElementById("btnRegister");
+  const registerStatusBox = document.getElementById("registerStatus");
 
   function setButtonsEnabled(enabled) {
     btnCheckin.disabled = !enabled;
@@ -263,6 +334,11 @@
     projectLabelEl.textContent = projectCode ? t.projectWithCode(projectCode) : t.projectNoCode;
   }
 
+  function renderModeToggle() {
+    const t = translations[currentLang];
+    modeToggleBtn.textContent = currentView === "checkin" ? t.registerLink : t.backToCheckin;
+  }
+
   function applyLanguage() {
     const t = translations[currentLang];
     pageTitleEl.textContent = t.pageTitle;
@@ -271,8 +347,13 @@
     employeeIdInput.placeholder = t.employeeIdPlaceholder;
     btnCheckin.textContent = t.btnCheckin;
     btnCheckout.textContent = t.btnCheckout;
+    regNameLabelEl.textContent = t.nameLabel;
+    regNameInput.placeholder = t.namePlaceholder;
+    regPinLabelEl.textContent = t.pinSetupLabel;
+    btnRegister.textContent = t.btnRegister;
     renderProjectLabel();
     renderLocNote();
+    renderModeToggle();
   }
   applyLanguage();
 
@@ -282,7 +363,18 @@
     applyLanguage();
   });
 
-  // 사번 입력 시 이름 실시간 표시 (오타로 다른 사람 계정 입력하는 실수 방지)
+  modeToggleBtn.addEventListener("click", () => {
+    currentView = currentView === "checkin" ? "register" : "checkin";
+    checkinView.style.display = currentView === "checkin" ? "" : "none";
+    registerView.style.display = currentView === "register" ? "" : "none";
+    statusBox.textContent = "";
+    statusBox.className = "status-box";
+    registerStatusBox.textContent = "";
+    registerStatusBox.className = "status-box";
+    renderModeToggle();
+  });
+
+  // 사번 입력 시 이름 실시간 표시 (오타로 다른 사람 계정 입력하는 실수 방지) + 대문자 강제
   let lookupTimer = null;
   employeeIdInput.addEventListener("input", () => {
     const selStart = employeeIdInput.selectionStart;
@@ -314,7 +406,12 @@
 
   function showStatus(message, ok) {
     statusBox.textContent = message;
-    statusBox.className = ok ? "ok" : "err";
+    statusBox.className = "status-box " + (ok ? "ok" : "err");
+  }
+
+  function showRegisterStatus(message, ok) {
+    registerStatusBox.textContent = message;
+    registerStatusBox.className = "status-box " + (ok ? "ok" : "err");
   }
 
   if (!navigator.geolocation) {
@@ -401,6 +498,48 @@
     }
   }
 
+  async function submitRegister() {
+    const t = translations[currentLang];
+    const name = regNameInput.value.trim();
+    const pin = regPinInput.value.trim();
+
+    if (!name || !pin) {
+      showRegisterStatus(t.needNameAndPin, false);
+      return;
+    }
+    if (!/^\d{4,6}$/.test(pin)) {
+      showRegisterStatus(t.invalidPin, false);
+      return;
+    }
+
+    btnRegister.disabled = true;
+    showRegisterStatus(t.registering, true);
+
+    try {
+      const pinSalt = await generateSalt();
+      const pinHash = await hashPin(pin, pinSalt);
+
+      const res = await fetch(F21_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, pinHash, pinSalt, projectCode })
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        showRegisterStatus(t.registerSuccess(data.employeeId), true);
+        regNameInput.value = "";
+        regPinInput.value = "";
+      } else {
+        showRegisterStatus(translateReason(data.reason), false);
+      }
+    } catch (e) {
+      showRegisterStatus(t.networkError, false);
+    } finally {
+      btnRegister.disabled = false;
+    }
+  }
+
   function translateReason(reason) {
     const t = translations[currentLang];
     return t.reasons[reason] || reason || t.unknownError;
@@ -408,6 +547,7 @@
 
   btnCheckin.addEventListener("click", () => submitCheck("checkin"));
   btnCheckout.addEventListener("click", () => submitCheck("checkout"));
+  btnRegister.addEventListener("click", submitRegister);
 </script>
 </body>
 </html>
