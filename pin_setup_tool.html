@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ZPEX — Worker PIN Setup Tool</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f5f5f5; color: #414141; }
+  .header { background: #B40E22; color: white; padding: 16px 24px; }
+  .header h1 { font-size: 18px; font-weight: 600; }
+  .header p { font-size: 13px; opacity: 0.85; margin-top: 2px; }
+  .container { max-width: 520px; margin: 32px auto; padding: 0 16px; }
+  .card { background: white; border-radius: 10px; border: 1px solid #e0e0e0; padding: 24px; margin-bottom: 16px; }
+  label { display: block; font-size: 13px; font-weight: 600; color: #414141; margin-bottom: 6px; }
+  input { width: 100%; padding: 10px 12px; border: 1px solid #D2D2D2; border-radius: 6px; font-size: 15px; outline: none; }
+  input:focus { border-color: #B40E22; }
+  input[type="password"] { letter-spacing: 4px; font-size: 18px; }
+  .field { margin-bottom: 16px; }
+  .btn { width: 100%; padding: 12px; background: #B40E22; color: white; border: none; border-radius: 6px; font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 4px; }
+  .btn:hover { background: #8f0b1b; }
+  .btn:disabled { background: #ccc; cursor: not-allowed; }
+  .result { display: none; background: #f5f5f5; border-radius: 6px; padding: 16px; margin-top: 16px; }
+  .result.show { display: block; }
+  .result label { font-size: 12px; color: #888; margin-bottom: 4px; }
+  .hash-box { background: white; border: 1px solid #D2D2D2; border-radius: 6px; padding: 10px 12px; font-family: monospace; font-size: 12px; word-break: break-all; color: #414141; }
+  .copy-btn { width: 100%; padding: 8px; background: #414141; color: white; border: none; border-radius: 6px; font-size: 13px; cursor: pointer; margin-top: 8px; }
+  .copy-btn:hover { background: #222; }
+  .notice { background: #fff8e1; border: 1px solid #ffe082; border-radius: 6px; padding: 12px; font-size: 13px; color: #555; margin-bottom: 16px; }
+  .notice strong { color: #B40E22; }
+  .step { font-size: 12px; color: #888; margin-top: 12px; line-height: 1.6; }
+  .copied { color: #22c55e; font-size: 12px; margin-top: 4px; display: none; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>ZPEX — Worker PIN Setup</h1>
+  <p>Admin tool · Generate PIN hash for Workers list</p>
+</div>
+
+<div class="container">
+
+  <div class="notice">
+    <strong>사용 방법:</strong> 기존 직원은 SharePoint <strong>PINSalt</strong> 값을 그대로 붙여넣고 PIN만 입력하세요(PINHash만 갱신).
+    신규 직원은 "새 Salt 생성"으로 Salt를 만든 뒤 PIN을 입력하면 Salt/Hash 둘 다 나옵니다 — 둘 다 SharePoint Workers 리스트에 붙여넣으세요.
+  </div>
+
+  <div class="card">
+    <div class="field">
+      <label>PIN Salt</label>
+      <input type="text" id="pinSalt" placeholder="예: 0f2ab86cf1fea3024f10e48500a10484" autocomplete="off">
+      <button class="copy-btn" type="button" onclick="generateSalt()">새 Salt 생성 (신규 직원용)</button>
+    </div>
+    <div class="field">
+      <label>PIN (4~6자리 숫자)</label>
+      <input type="password" id="pin" placeholder="••••" maxlength="6" inputmode="numeric" pattern="[0-9]*">
+    </div>
+    <button class="btn" onclick="generateHash()">해시 생성</button>
+
+    <div class="result" id="result">
+      <label>PINSalt (SharePoint에 붙여넣기)</label>
+      <div class="hash-box" id="saltValue"></div>
+      <label style="margin-top:12px;">PINHash (SharePoint에 붙여넣기)</label>
+      <div class="hash-box" id="hashValue"></div>
+      <button class="copy-btn" onclick="copyHash()">해시 복사</button>
+      <div class="copied" id="copiedMsg">✓ 복사됨</div>
+      <div class="step">
+        1. 위 Salt/Hash 값 복사<br>
+        2. SharePoint → Workers 리스트 → 해당 직원 행 편집<br>
+        3. (신규 직원만) PINSalt 컬럼에 Salt 붙여넣기<br>
+        4. PINHash 컬럼에 Hash 붙여넣기 → 저장
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function generateSalt() {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  const salt  = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+  document.getElementById('pinSalt').value = salt;
+}
+
+async function generateHash() {
+  const salt = document.getElementById('pinSalt').value.trim();
+  const pin  = document.getElementById('pin').value.trim();
+
+  if (!salt) { alert('PIN Salt를 입력하거나 "새 Salt 생성"을 눌러주세요.'); return; }
+  if (!/^\d{4,6}$/.test(pin)) { alert('PIN은 4~6자리 숫자여야 합니다.'); return; }
+
+  const input  = pin + salt;
+  const buffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input));
+  const hash   = Array.from(new Uint8Array(buffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+
+  document.getElementById('saltValue').textContent = salt;
+  document.getElementById('hashValue').textContent = hash;
+  document.getElementById('result').classList.add('show');
+  document.getElementById('copiedMsg').style.display = 'none';
+}
+
+function copyHash() {
+  const hash = document.getElementById('hashValue').textContent;
+  navigator.clipboard.writeText(hash).then(() => {
+    document.getElementById('copiedMsg').style.display = 'block';
+    setTimeout(() => { document.getElementById('copiedMsg').style.display = 'none'; }, 2000);
+  });
+}
+
+// Enter 키로 생성
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter') generateHash();
+});
+</script>
+</body>
+</html>
