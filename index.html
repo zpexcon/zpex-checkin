@@ -231,8 +231,7 @@
       projectNoCode: "⚠ 프로젝트 코드가 없습니다. QR을 다시 스캔하세요.",
       locChecking: "위치 확인 중...",
       locNotSupported: "이 브라우저는 위치 확인을 지원하지 않습니다.",
-      locInRange: (m) => `현장 반경 내 확인됨 (약 ${m}m)`,
-      locOutOfRange: (m) => `⚠ 현장에서 약 ${m}m 떨어져 있습니다. 현장 근처에서 다시 시도하세요.`,
+      locDistance: (m) => `위치 확인됨 — 현장까지 약 ${m}m (허용 범위는 체크인 시 확인)`,
       locNoSiteCoord: "위치 확인됨 (현장 좌표 정보 없음 — 서버에서 검증)",
       locFailed: "⚠ 위치 확인 실패. 위치 접근 권한을 허용해주세요.",
       needBoth: "사번과 PIN을 모두 입력하세요.",
@@ -283,8 +282,7 @@
       projectNoCode: "⚠ No project code found. Please rescan the QR code.",
       locChecking: "Checking location...",
       locNotSupported: "This browser does not support location services.",
-      locInRange: (m) => `Within site range (approx. ${m}m)`,
-      locOutOfRange: (m) => `⚠ You are approximately ${m}m from the site. Please try again near the site.`,
+      locDistance: (m) => `Location confirmed — approx. ${m}m from the site (range is checked when you check in)`,
       locNoSiteCoord: "Location confirmed (no site coordinates set — verified on server)",
       locFailed: "⚠ Location check failed. Please allow location access.",
       needBoth: "Please enter both Employee ID and PIN.",
@@ -335,8 +333,7 @@
       projectNoCode: "⚠ No se encontró el código de obra. Escanee el código QR de nuevo.",
       locChecking: "Verificando ubicación...",
       locNotSupported: "Este navegador no admite servicios de ubicación.",
-      locInRange: (m) => `Dentro del área de la obra (aprox. ${m} m)`,
-      locOutOfRange: (m) => `⚠ Está a aprox. ${m} m de la obra. Inténtelo de nuevo cerca de la obra.`,
+      locDistance: (m) => `Ubicación confirmada — a aprox. ${m} m de la obra (el área se verifica al registrar)`,
       locNoSiteCoord: "Ubicación confirmada (la obra no tiene coordenadas — se verifica en el servidor)",
       locFailed: "⚠ No se pudo verificar la ubicación. Permita el acceso a la ubicación.",
       needBoth: "Ingrese su número de empleado y su PIN.",
@@ -459,8 +456,7 @@
     const t = translations[currentLang];
     switch (locState.type) {
       case "notSupported": locNote.textContent = t.locNotSupported; break;
-      case "inRange": locNote.textContent = t.locInRange(locState.dist); break;
-      case "outOfRange": locNote.textContent = t.locOutOfRange(locState.dist); break;
+      case "distance": locNote.textContent = t.locDistance(locState.dist); break;
       case "noSiteCoord": locNote.textContent = t.locNoSiteCoord; break;
       case "failed": locNote.textContent = t.locFailed; break;
       default: locNote.textContent = t.locChecking;
@@ -588,14 +584,10 @@
       (pos) => {
         currentPos = pos.coords;
         if (!isNaN(siteLat) && !isNaN(siteLng)) {
+          // 범위 판정은 F-05가 프로젝트별 반경(Projects.GeofenceRadiusM)으로 수행 — 페이지는 거리 안내만 (2026-09-25)
           const dist = haversineMeters(currentPos.latitude, currentPos.longitude, siteLat, siteLng);
-          if (dist <= 200) {
-            locState = { type: "inRange", dist: Math.round(dist) };
-            setButtonsEnabled(true);
-          } else {
-            locState = { type: "outOfRange", dist: Math.round(dist) };
-            setButtonsEnabled(false);
-          }
+          locState = { type: "distance", dist: Math.round(dist) };
+          setButtonsEnabled(true);
         } else {
           locState = { type: "noSiteCoord", dist: null };
           setButtonsEnabled(true);
