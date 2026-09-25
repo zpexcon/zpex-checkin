@@ -40,17 +40,27 @@
     color: var(--zpex-red);
     margin: 0 0 4px;
   }
+  /* 언어 선택 (한국어/영어/스페인어) */
+  .lang-group {
+    display: flex;
+    flex: none;
+    border: 1px solid var(--zpex-bordergray);
+    border-radius: 4px;
+    overflow: hidden;
+  }
   .lang-btn {
     flex: none;
     padding: 4px 10px;
     font-size: 12px;
     font-weight: 600;
-    border: 1px solid var(--zpex-bordergray);
-    border-radius: 4px;
+    border: none;
+    border-radius: 0;
     background: var(--zpex-white);
     color: var(--zpex-charcoal);
     cursor: pointer;
   }
+  .lang-btn + .lang-btn { border-left: 1px solid var(--zpex-bordergray); }
+  .lang-btn.active { background: var(--zpex-red); color: var(--zpex-white); }
   .sub {
     font-size: 13px;
     color: var(--zpex-charcoal);
@@ -90,6 +100,22 @@
   #btnCheckin { background: var(--zpex-red); color: var(--zpex-white); }
   #btnCheckout { background: var(--zpex-charcoal); color: var(--zpex-white); }
   #btnRegister { background: var(--zpex-red); color: var(--zpex-white); }
+  #btnGoCheckin { background: var(--zpex-red); color: var(--zpex-white); font-size: 17px; padding: 14px; }
+  /* 등록 전 이름 확인 화면 — 철자 확인 기회 (등록 후 재입력 시 사번 중복 발급 방지) */
+  #registerConfirm { display: none; text-align: center; }
+  .confirm-title { font-size: 16px; font-weight: 700; margin: 4px 0 16px; }
+  .confirm-name-label { font-size: 14px; opacity: 0.7; }
+  .confirm-name { font-size: 32px; font-weight: 800; color: var(--zpex-charcoal); line-height: 1.2; margin: 4px 0 16px; word-break: break-word; }
+  .confirm-note { font-size: 14px; line-height: 1.5; opacity: 0.8; }
+  #btnConfirmEdit { background: var(--zpex-lightgray); color: var(--zpex-charcoal); border: 1px solid var(--zpex-bordergray); }
+  #btnConfirmRegister { background: var(--zpex-red); color: var(--zpex-white); }
+  /* 등록 완료 화면 — 사번을 크게 보여주고 기억하도록 안내 */
+  #registerDone { display: none; text-align: center; }
+  .done-title { font-size: 18px; font-weight: 700; color: #2E7D32; margin: 4px 0 16px; }
+  .done-name { font-size: 22px; font-weight: 700; color: var(--zpex-charcoal); margin: 0 0 12px; word-break: break-word; }
+  .done-id-label { font-size: 14px; color: var(--zpex-charcoal); opacity: 0.7; }
+  .done-id { font-size: 56px; font-weight: 800; color: var(--zpex-red); letter-spacing: 4px; line-height: 1.1; margin: 4px 0 16px; }
+  .done-notice { background: #FFF8E1; border: 1px solid #FFC107; border-radius: 6px; padding: 12px; font-size: 15px; font-weight: 600; line-height: 1.5; text-align: left; }
   button:disabled { opacity: 0.5; cursor: not-allowed; }
   .status-box {
     margin-top: 16px;
@@ -121,13 +147,17 @@
 <div class="card">
   <div class="header-row">
     <h1 id="pageTitle">ZPEX 현장 체크인</h1>
-    <button id="langToggle" type="button" class="lang-btn">EN</button>
+    <div class="lang-group" role="group" aria-label="Language">
+      <button type="button" class="lang-btn" data-lang="ko">한</button>
+      <button type="button" class="lang-btn" data-lang="en">EN</button>
+      <button type="button" class="lang-btn" data-lang="es">ES</button>
+    </div>
   </div>
   <p class="sub" id="projectLabel">프로젝트 확인 중...</p>
 
   <div id="checkinView">
     <label for="employeeId" id="employeeIdLabel">사번 (Employee ID)</label>
-    <input id="employeeId" name="employeeId" type="text" inputmode="text" autocomplete="username" placeholder="예: 2026XXX">
+    <input id="employeeId" name="employeeId" type="text" inputmode="text" autocomplete="username" placeholder="예: 26XXX">
     <div id="nameConfirm"></div>
 
     <label for="pin">PIN</label>
@@ -143,6 +173,7 @@
   </div>
 
   <div id="registerView" style="display:none;">
+   <div id="registerForm">
     <label for="regName" id="regNameLabel">이름 (Name)</label>
     <input id="regName" type="text" placeholder="예: 홍길동">
 
@@ -154,6 +185,30 @@
     </div>
 
     <div id="registerStatus" class="status-box"></div>
+   </div>
+
+   <div id="registerConfirm">
+    <div class="confirm-title" id="confirmTitle">입력한 이름이 맞는지 확인하세요</div>
+    <div class="confirm-name-label" id="confirmNameLabel">이름 (Name)</div>
+    <div class="confirm-name" id="confirmName"></div>
+    <div class="confirm-note" id="confirmNote"></div>
+    <div class="action-row">
+      <button id="btnConfirmEdit" type="button">다시 입력</button>
+      <button id="btnConfirmRegister" type="button">맞아요, 등록</button>
+    </div>
+    <div id="confirmStatus" class="status-box"></div>
+   </div>
+
+   <div id="registerDone">
+    <div class="done-title" id="doneTitle">등록 완료!</div>
+    <div class="done-name" id="doneName"></div>
+    <div class="done-id-label" id="doneIdLabel">내 사번 (Employee ID)</div>
+    <div class="done-id" id="doneId"></div>
+    <div class="done-notice" id="doneNotice"></div>
+    <div class="action-row">
+      <button id="btnGoCheckin" type="button">체크인하러 가기</button>
+    </div>
+   </div>
   </div>
 
   <button id="modeToggle" type="button" class="link-btn">신규 등록</button>
@@ -168,7 +223,6 @@
   const translations = {
     ko: {
       pageTitle: "ZPEX 현장 체크인",
-      toggleLabel: "EN",
       employeeIdLabel: "사번 (Employee ID)",
       employeeIdPlaceholder: "예: 26XXX",
       btnCheckin: "체크인",
@@ -199,7 +253,15 @@
       needNameAndPin: "이름과 PIN을 모두 입력하세요.",
       invalidPin: "PIN은 4~6자리 숫자여야 합니다.",
       registering: "등록 처리 중...",
-      registerSuccess: (id) => `등록 완료! 사번: ${id} — 이 번호와 PIN으로 체크인하세요.`,
+      confirmTitle: "입력한 이름이 맞는지 확인하세요",
+      confirmNameLabel: "이름 (Name)",
+      confirmNote: "이 이름으로 등록됩니다. 철자가 틀렸다면 '다시 입력'을 누르세요.",
+      btnConfirmEdit: "다시 입력",
+      btnConfirmRegister: "맞아요, 등록",
+      doneTitle: "✅ 등록 완료!",
+      doneIdLabel: "내 사번 (Employee ID)",
+      doneNotice: "⚠ 체크인·체크아웃할 때마다 이 사번과 방금 설정한 PIN을 입력해야 합니다. 꼭 기억하시고, 지금 이 화면을 캡처(스크린샷)해 두세요.",
+      btnGoCheckin: "체크인하러 가기",
       reasons: {
         not_found: "등록되지 않은 사번입니다.",
         locked: "계정이 잠금되었습니다. 관리자에게 문의하세요.",
@@ -213,9 +275,8 @@
     },
     en: {
       pageTitle: "ZPEX Site Check-In",
-      toggleLabel: "한국어",
       employeeIdLabel: "Employee ID",
-      employeeIdPlaceholder: "e.g. 2026XXX",
+      employeeIdPlaceholder: "e.g. 26XXX",
       btnCheckin: "Check In",
       btnCheckout: "Check Out",
       projectWithCode: (code) => `Site Code: ${code}`,
@@ -244,7 +305,15 @@
       needNameAndPin: "Please enter both name and PIN.",
       invalidPin: "PIN must be 4-6 digits.",
       registering: "Registering...",
-      registerSuccess: (id) => `Registration complete! Employee ID: ${id} — use this ID and PIN to check in.`,
+      confirmTitle: "Please check that your name is correct",
+      confirmNameLabel: "Name",
+      confirmNote: "You will be registered under this name. If the spelling is wrong, tap 'Edit'.",
+      btnConfirmEdit: "Edit",
+      btnConfirmRegister: "Yes, Register",
+      doneTitle: "✅ Registration complete!",
+      doneIdLabel: "Your Employee ID",
+      doneNotice: "⚠ You will need this Employee ID and the PIN you just set every time you check in or out. Please remember it and take a screenshot of this screen now.",
+      btnGoCheckin: "Go to Check-In",
       reasons: {
         not_found: "Employee ID not found.",
         locked: "Account locked. Please contact your administrator.",
@@ -255,10 +324,63 @@
         not_checked_in: "No check-in record found.",
         project_not_found: "Project not found. Please rescan the QR code."
       }
+    },
+    es: {
+      pageTitle: "ZPEX Registro en Obra",
+      employeeIdLabel: "Número de empleado",
+      employeeIdPlaceholder: "ej. 26XXX",
+      btnCheckin: "Entrada",
+      btnCheckout: "Salida",
+      projectWithCode: (code) => `Código de obra: ${code}`,
+      projectNoCode: "⚠ No se encontró el código de obra. Escanee el código QR de nuevo.",
+      locChecking: "Verificando ubicación...",
+      locNotSupported: "Este navegador no admite servicios de ubicación.",
+      locInRange: (m) => `Dentro del área de la obra (aprox. ${m} m)`,
+      locOutOfRange: (m) => `⚠ Está a aprox. ${m} m de la obra. Inténtelo de nuevo cerca de la obra.`,
+      locNoSiteCoord: "Ubicación confirmada (la obra no tiene coordenadas — se verifica en el servidor)",
+      locFailed: "⚠ No se pudo verificar la ubicación. Permita el acceso a la ubicación.",
+      needBoth: "Ingrese su número de empleado y su PIN.",
+      needLocation: "Espere a que se confirme la ubicación.",
+      processing: "Procesando...",
+      workerNotFound: "Error: número de empleado no registrado.",
+      networkError: "Error de red. Inténtelo de nuevo.",
+      doneCheckin: "Entrada registrada",
+      doneCheckout: "Salida registrada",
+      late: " (Tarde)",
+      unknownError: "Error desconocido",
+      registerLink: "Nuevo registro",
+      backToCheckin: "← Volver al registro de entrada",
+      nameLabel: "Nombre",
+      namePlaceholder: "ej. Juan Pérez",
+      pinSetupLabel: "Crear PIN (4-6 dígitos)",
+      btnRegister: "Registrar",
+      needNameAndPin: "Ingrese su nombre y su PIN.",
+      invalidPin: "El PIN debe tener de 4 a 6 dígitos.",
+      registering: "Registrando...",
+      confirmTitle: "Verifique que su nombre sea correcto",
+      confirmNameLabel: "Nombre",
+      confirmNote: "Se registrará con este nombre. Si está mal escrito, toque 'Corregir'.",
+      btnConfirmEdit: "Corregir",
+      btnConfirmRegister: "Sí, registrar",
+      doneTitle: "✅ ¡Registro completado!",
+      doneIdLabel: "Su número de empleado",
+      doneNotice: "⚠ Necesitará este número de empleado y el PIN que acaba de crear cada vez que registre su entrada o salida. Recuérdelo y tome una captura de pantalla ahora.",
+      btnGoCheckin: "Ir al registro de entrada",
+      reasons: {
+        not_found: "Número de empleado no registrado.",
+        locked: "Cuenta bloqueada. Comuníquese con el administrador.",
+        pin_mismatch: "El PIN no coincide.",
+        wrong_project: "No está asignado a esta obra.",
+        out_of_range: "Fuera del área de la obra.",
+        already_checked_in: "Ya registró su entrada.",
+        not_checked_in: "No hay registro de entrada.",
+        project_not_found: "No se encontró la obra. Escanee el código QR de nuevo."
+      }
     }
   };
 
   let currentLang = localStorage.getItem("zpexCheckinLang") || "ko";
+  if (!translations[currentLang]) currentLang = "ko";
   let currentView = "checkin";
 
   async function lookupWorker(employeeId) {
@@ -288,7 +410,7 @@
   const siteLng = parseFloat(params.get("siteLng"));
 
   const pageTitleEl = document.getElementById("pageTitle");
-  const langToggleBtn = document.getElementById("langToggle");
+  const langBtns = document.querySelectorAll(".lang-btn");
   const projectLabelEl = document.getElementById("projectLabel");
   const employeeIdLabelEl = document.getElementById("employeeIdLabel");
   let currentPos = null;
@@ -308,6 +430,22 @@
   const regPinInput = document.getElementById("regPin");
   const btnRegister = document.getElementById("btnRegister");
   const registerStatusBox = document.getElementById("registerStatus");
+  const registerForm = document.getElementById("registerForm");
+  const registerDone = document.getElementById("registerDone");
+  const registerConfirm = document.getElementById("registerConfirm");
+  const confirmTitleEl = document.getElementById("confirmTitle");
+  const confirmNameLabelEl = document.getElementById("confirmNameLabel");
+  const confirmNameEl = document.getElementById("confirmName");
+  const confirmNoteEl = document.getElementById("confirmNote");
+  const btnConfirmEdit = document.getElementById("btnConfirmEdit");
+  const btnConfirmRegister = document.getElementById("btnConfirmRegister");
+  const confirmStatusBox = document.getElementById("confirmStatus");
+  const doneTitleEl = document.getElementById("doneTitle");
+  const doneIdLabelEl = document.getElementById("doneIdLabel");
+  const doneIdEl = document.getElementById("doneId");
+  const doneNameEl = document.getElementById("doneName");
+  const doneNoticeEl = document.getElementById("doneNotice");
+  const btnGoCheckin = document.getElementById("btnGoCheckin");
 
   function setButtonsEnabled(enabled) {
     btnCheckin.disabled = !enabled;
@@ -342,7 +480,8 @@
   function applyLanguage() {
     const t = translations[currentLang];
     pageTitleEl.textContent = t.pageTitle;
-    langToggleBtn.textContent = t.toggleLabel;
+    document.documentElement.lang = currentLang;
+    langBtns.forEach(b => b.classList.toggle("active", b.dataset.lang === currentLang));
     employeeIdLabelEl.textContent = t.employeeIdLabel;
     employeeIdInput.placeholder = t.employeeIdPlaceholder;
     btnCheckin.textContent = t.btnCheckin;
@@ -351,27 +490,54 @@
     regNameInput.placeholder = t.namePlaceholder;
     regPinLabelEl.textContent = t.pinSetupLabel;
     btnRegister.textContent = t.btnRegister;
+    confirmTitleEl.textContent = t.confirmTitle;
+    confirmNameLabelEl.textContent = t.confirmNameLabel;
+    confirmNoteEl.textContent = t.confirmNote;
+    btnConfirmEdit.textContent = t.btnConfirmEdit;
+    btnConfirmRegister.textContent = t.btnConfirmRegister;
+    doneTitleEl.textContent = t.doneTitle;
+    doneIdLabelEl.textContent = t.doneIdLabel;
+    doneNoticeEl.textContent = t.doneNotice;
+    btnGoCheckin.textContent = t.btnGoCheckin;
     renderProjectLabel();
     renderLocNote();
     renderModeToggle();
   }
   applyLanguage();
 
-  langToggleBtn.addEventListener("click", () => {
-    currentLang = currentLang === "ko" ? "en" : "ko";
+  langBtns.forEach(b => b.addEventListener("click", () => {
+    currentLang = b.dataset.lang;
     localStorage.setItem("zpexCheckinLang", currentLang);
     applyLanguage();
-  });
+  }));
 
-  modeToggleBtn.addEventListener("click", () => {
-    currentView = currentView === "checkin" ? "register" : "checkin";
+  function setView(view) {
+    currentView = view;
     checkinView.style.display = currentView === "checkin" ? "" : "none";
     registerView.style.display = currentView === "register" ? "" : "none";
     statusBox.textContent = "";
     statusBox.className = "status-box";
     registerStatusBox.textContent = "";
     registerStatusBox.className = "status-box";
+    // 등록 완료 화면은 떠날 때 초기화 (다음 등록 시 입력 폼부터 다시 보이도록)
+    registerForm.style.display = "";
+    registerConfirm.style.display = "none";
+    registerDone.style.display = "none";
+    modeToggleBtn.style.display = "";
     renderModeToggle();
+  }
+
+  modeToggleBtn.addEventListener("click", () => {
+    setView(currentView === "checkin" ? "register" : "checkin");
+  });
+
+  // 등록 완료 → 체크인 화면으로 이동하면서 방금 받은 사번을 미리 채움 (이름 확인도 자동 실행)
+  btnGoCheckin.addEventListener("click", () => {
+    const id = doneIdEl.textContent;
+    setView("checkin");
+    employeeIdInput.value = id;
+    employeeIdInput.dispatchEvent(new Event("input"));
+    document.getElementById("pin").focus();
   });
 
   // 사번 입력 시 이름 실시간 표시 (오타로 다른 사람 계정 입력하는 실수 방지) + 대문자 강제
@@ -498,7 +664,8 @@
     }
   }
 
-  async function submitRegister() {
+  // 1단계: 입력 검증 후 이름 확인 화면으로 (아직 등록 안 함)
+  function submitRegister() {
     const t = translations[currentLang];
     const name = regNameInput.value.trim();
     const pin = regPinInput.value.trim();
@@ -512,8 +679,32 @@
       return;
     }
 
-    btnRegister.disabled = true;
-    showRegisterStatus(t.registering, true);
+    registerStatusBox.textContent = "";
+    registerStatusBox.className = "status-box";
+    confirmStatusBox.textContent = "";
+    confirmStatusBox.className = "status-box";
+    confirmNameEl.textContent = name;
+    registerForm.style.display = "none";
+    registerConfirm.style.display = "block";
+  }
+
+  // 이름이 틀렸으면 입력 폼으로 복귀 (입력값 유지)
+  function editRegister() {
+    registerConfirm.style.display = "none";
+    registerForm.style.display = "";
+    regNameInput.focus();
+  }
+
+  // 2단계: 확인 후 실제 등록 (F-21 호출 → 사번 발급)
+  async function confirmRegister() {
+    const t = translations[currentLang];
+    const name = regNameInput.value.trim();
+    const pin = regPinInput.value.trim();
+
+    btnConfirmRegister.disabled = true;
+    btnConfirmEdit.disabled = true;
+    confirmStatusBox.textContent = t.registering;
+    confirmStatusBox.className = "status-box ok";
 
     try {
       const pinSalt = await generateSalt();
@@ -527,16 +718,25 @@
       const data = await res.json();
 
       if (data.success) {
-        showRegisterStatus(t.registerSuccess(data.employeeId), true);
+        confirmStatusBox.textContent = "";
+        confirmStatusBox.className = "status-box";
+        doneNameEl.textContent = name;
+        doneIdEl.textContent = data.employeeId;
+        registerConfirm.style.display = "none";
+        registerDone.style.display = "block";
+        modeToggleBtn.style.display = "none";
         regNameInput.value = "";
         regPinInput.value = "";
       } else {
-        showRegisterStatus(translateReason(data.reason), false);
+        confirmStatusBox.textContent = translateReason(data.reason);
+        confirmStatusBox.className = "status-box err";
       }
     } catch (e) {
-      showRegisterStatus(t.networkError, false);
+      confirmStatusBox.textContent = t.networkError;
+      confirmStatusBox.className = "status-box err";
     } finally {
-      btnRegister.disabled = false;
+      btnConfirmRegister.disabled = false;
+      btnConfirmEdit.disabled = false;
     }
   }
 
@@ -548,6 +748,8 @@
   btnCheckin.addEventListener("click", () => submitCheck("checkin"));
   btnCheckout.addEventListener("click", () => submitCheck("checkout"));
   btnRegister.addEventListener("click", submitRegister);
+  btnConfirmEdit.addEventListener("click", editRegister);
+  btnConfirmRegister.addEventListener("click", confirmRegister);
 </script>
 </body>
 </html>
