@@ -128,6 +128,11 @@
   .status-box.err { background: #FDECEA; color: var(--zpex-red); display: block; }
   #locNote { font-size: 12px; color: var(--zpex-charcoal); opacity: 0.6; margin-top: 8px; }
   #nameConfirm { font-size: 20px; font-weight: 700; color: var(--zpex-charcoal); min-height: 26px; margin-top: 2px; }
+  .remember-row { display:flex; align-items:center; gap:8px; margin:10px 0 2px; font-size:14px; font-weight:400; }
+  .remember-row input { width:auto; margin:0; }
+  #rememberedBox { display:none; text-align:center; padding:14px 0 6px; }
+  #rememberedHello { font-size:20px; font-weight:700; }
+  #rememberedId { font-size:14px; color:#666; margin-top:4px; }
   .link-btn {
     display: block;
     width: 100%;
@@ -156,12 +161,20 @@
   <p class="sub" id="projectLabel">프로젝트 확인 중...</p>
 
   <div id="checkinView">
+    <div id="rememberedBox">
+      <div id="rememberedHello"></div>
+      <div id="rememberedId"></div>
+      <button id="btnForget" type="button" class="link-btn">다른 사람으로 체크인</button>
+    </div>
+    <div id="credFields">
     <label for="employeeId" id="employeeIdLabel">사번 (Employee ID)</label>
     <input id="employeeId" name="employeeId" type="text" inputmode="text" autocomplete="username" placeholder="예: 26XXX">
     <div id="nameConfirm"></div>
 
     <label for="pin">PIN</label>
     <input id="pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="••••">
+    <label class="remember-row"><input type="checkbox" id="rememberDevice" checked> <span id="rememberLabel">이 폰 기억하기 (다음부터 PIN 없이 체크인)</span></label>
+    </div>
 
     <div class="action-row">
       <button id="btnCheckin">체크인</button>
@@ -261,6 +274,11 @@
       doneIdLabel: "내 사번 (Employee ID)",
       doneNotice: "⚠ 체크인·체크아웃할 때마다 이 사번과 방금 설정한 PIN을 입력해야 합니다. 꼭 기억하시고, 지금 이 화면을 캡처(스크린샷)해 두세요.",
       btnGoCheckin: "체크인하러 가기",
+      rememberLabel: "이 폰 기억하기 (다음부터 PIN 없이 체크인)",
+      rememberedHello: (name) => `${name} 님`,
+      rememberedId: (id) => `사번 ${id} · 이 폰으로 등록됨`,
+      forgetLink: "다른 사람으로 체크인",
+      deviceExpired: "이 폰의 등록이 해제되었습니다. 사번과 PIN으로 다시 체크인하세요.",
       reasons: {
         not_found: "등록되지 않은 사번입니다.",
         locked: "계정이 잠금되었습니다. 관리자에게 문의하세요.",
@@ -312,6 +330,11 @@
       doneIdLabel: "Your Employee ID",
       doneNotice: "⚠ You will need this Employee ID and the PIN you just set every time you check in or out. Please remember it and take a screenshot of this screen now.",
       btnGoCheckin: "Go to Check-In",
+      rememberLabel: "Remember this phone (no PIN next time)",
+      rememberedHello: (name) => `${name}`,
+      rememberedId: (id) => `Employee ID ${id} · registered on this phone`,
+      forgetLink: "Check in as someone else",
+      deviceExpired: "This phone is no longer registered. Please check in again with your Employee ID and PIN.",
       reasons: {
         not_found: "Employee ID not found.",
         locked: "Account locked. Please contact your administrator.",
@@ -363,6 +386,11 @@
       doneIdLabel: "Su número de empleado",
       doneNotice: "⚠ Necesitará este número de empleado y el PIN que acaba de crear cada vez que registre su entrada o salida. Recuérdelo y tome una captura de pantalla ahora.",
       btnGoCheckin: "Ir al registro de entrada",
+      rememberLabel: "Recordar este teléfono (sin PIN la próxima vez)",
+      rememberedHello: (name) => `${name}`,
+      rememberedId: (id) => `Empleado ${id} · registrado en este teléfono`,
+      forgetLink: "Registrar a otra persona",
+      deviceExpired: "Este teléfono ya no está registrado. Registre su entrada de nuevo con su número de empleado y PIN.",
       reasons: {
         not_found: "Número de empleado no registrado.",
         locked: "Cuenta bloqueada. Comuníquese con el administrador.",
@@ -394,6 +422,25 @@
   async function hashPin(pin, salt) {
     const buffer = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(pin + salt));
     return Array.from(new Uint8Array(buffer)).map(b => b.toString(16).padStart(2, "0")).join("");
+  }
+
+  // 기기 등록(2026-10-05, D-1 안 1): 무작위 기기 키는 이 폰 브라우저에만 저장, 서버에는 SHA-256(키+PINSalt)만 전송
+  const DEVICE_KEY = "zpexCheckinDevice";
+  function loadDevice() {
+    try {
+      const d = JSON.parse(localStorage.getItem(DEVICE_KEY) || "null");
+      return d && d.employeeId && d.token ? d : null;
+    } catch (e) { return null; }
+  }
+  function saveDevice(d) {
+    try { localStorage.setItem(DEVICE_KEY, JSON.stringify(d)); } catch (e) {}
+  }
+  function clearDevice() {
+    try { localStorage.removeItem(DEVICE_KEY); } catch (e) {}
+  }
+  function generateToken() {
+    const bytes = crypto.getRandomValues(new Uint8Array(32));
+    return Array.from(bytes).map(b => b.toString(16).padStart(2, "0")).join("");
   }
 
   async function generateSalt() {
@@ -443,6 +490,28 @@
   const doneNameEl = document.getElementById("doneName");
   const doneNoticeEl = document.getElementById("doneNotice");
   const btnGoCheckin = document.getElementById("btnGoCheckin");
+
+  const rememberedBox = document.getElementById("rememberedBox");
+  const rememberedHelloEl = document.getElementById("rememberedHello");
+  const rememberedIdEl = document.getElementById("rememberedId");
+  const btnForget = document.getElementById("btnForget");
+  const credFields = document.getElementById("credFields");
+  const rememberDeviceChk = document.getElementById("rememberDevice");
+  const rememberLabelEl = document.getElementById("rememberLabel");
+  let savedDevice = loadDevice();
+
+  function renderDeviceMode() {
+    const t = translations[currentLang];
+    const on = !!savedDevice;
+    rememberedBox.style.display = on ? "block" : "none";
+    credFields.style.display = on ? "none" : "";
+    if (on) {
+      rememberedHelloEl.textContent = t.rememberedHello(savedDevice.name || savedDevice.employeeId);
+      rememberedIdEl.textContent = t.rememberedId(savedDevice.employeeId);
+    }
+    btnForget.textContent = t.forgetLink;
+    rememberLabelEl.textContent = t.rememberLabel;
+  }
 
   function setButtonsEnabled(enabled) {
     btnCheckin.disabled = !enabled;
@@ -498,8 +567,18 @@
     renderProjectLabel();
     renderLocNote();
     renderModeToggle();
+    renderDeviceMode();
   }
   applyLanguage();
+
+  btnForget.addEventListener("click", () => {
+    clearDevice();
+    savedDevice = null;
+    statusBox.textContent = "";
+    statusBox.className = "status-box";
+    renderDeviceMode();
+    employeeIdInput.focus();
+  });
 
   langBtns.forEach(b => b.addEventListener("click", () => {
     currentLang = b.dataset.lang;
@@ -605,10 +684,11 @@
 
   async function submitCheck(action) {
     const t = translations[currentLang];
-    const employeeId = document.getElementById("employeeId").value.trim();
+    const deviceMode = !!savedDevice;
+    const employeeId = deviceMode ? savedDevice.employeeId : document.getElementById("employeeId").value.trim();
     const pin = document.getElementById("pin").value.trim();
 
-    if (!employeeId || !pin) {
+    if (!deviceMode && (!employeeId || !pin)) {
       showStatus(t.needBoth, false);
       return;
     }
@@ -623,29 +703,57 @@
     try {
       const worker = await lookupWorker(employeeId);
       if (!worker) {
-        showStatus(t.workerNotFound, false);
+        if (deviceMode) {
+          clearDevice();
+          savedDevice = null;
+          renderDeviceMode();
+          showStatus(t.deviceExpired, false);
+        } else {
+          showStatus(t.workerNotFound, false);
+        }
         setButtonsEnabled(true);
         return;
       }
-      const pinHash = await hashPin(pin, worker.salt);
+
+      const payload = {
+        employeeId,
+        projectCode,
+        action,
+        lat: currentPos.latitude,
+        lng: currentPos.longitude
+      };
+      let newToken = null;
+      if (deviceMode) {
+        payload.deviceTokenHash = await hashPin(savedDevice.token, worker.salt);
+      } else {
+        payload.pinHash = await hashPin(pin, worker.salt);
+        if (rememberDeviceChk.checked) {
+          newToken = generateToken();
+          payload.newDeviceTokenHash = await hashPin(newToken, worker.salt);
+        }
+      }
 
       const res = await fetch(F05_ENDPOINT, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          employeeId,
-          pinHash,
-          projectCode,
-          action,
-          lat: currentPos.latitude,
-          lng: currentPos.longitude
-        })
+        body: JSON.stringify(payload)
       });
       const data = await res.json();
 
       if (data.success) {
         const label = action === "checkin" ? t.doneCheckin : t.doneCheckout;
+        if (newToken) {
+          savedDevice = { employeeId, name: data.workerName || worker.name || employeeId, token: newToken };
+          saveDevice(savedDevice);
+          document.getElementById("pin").value = "";
+          renderDeviceMode();
+        }
         showStatus(`${label}: ${data.workerName || employeeId}${data.isLate ? t.late : ""}`, true);
+      } else if (deviceMode && (data.reason === "pin_mismatch" || data.reason === "not_found")) {
+        clearDevice();
+        savedDevice = null;
+        renderDeviceMode();
+        showStatus(t.deviceExpired, false);
       } else {
         showStatus(translateReason(data.reason), false);
       }
