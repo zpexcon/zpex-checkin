@@ -134,6 +134,10 @@
   #rememberedBox { display:none; text-align:center; padding:14px 0 6px; }
   #rememberedHello { font-size:20px; font-weight:700; }
   #rememberedId { font-size:14px; color:#666; margin-top:4px; }
+  #resetBox { display:none; margin-top:14px; padding:14px; border:1px solid #d2d2d2; border-radius:8px; background:#fafafa; }
+  #btnSetPin { background: var(--zpex-red); color: var(--zpex-white); }
+  #resetTitle { font-weight:700; font-size:16px; margin-bottom:6px; }
+  #resetGuide { font-size:14px; color:#555; margin-bottom:8px; }
   #todayInfo { display:none; margin:12px 0 0; padding:10px 12px; border-radius:8px; background:#f5f5f5; font-size:15px; text-align:center; }
   #todayInfo.done { background:#e8f5e9; color:#1b5e20; font-weight:600; }
   .link-btn {
@@ -174,13 +178,26 @@
     <input id="employeeId" name="employeeId" type="text" inputmode="text" autocomplete="username" placeholder="예: 26XXX">
     <div id="nameConfirm"></div>
 
+    <div id="pinFields">
     <label for="pin">PIN</label>
     <input id="pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="••••">
     <label class="remember-row"><input type="checkbox" id="rememberDevice" checked> <span id="rememberLabel">이 폰 기억하기 (다음부터 PIN 없이 체크인)</span></label>
     </div>
+    <div id="resetBox">
+      <div id="resetTitle">새 PIN 설정</div>
+      <div id="resetGuide"></div>
+      <label for="newPin" id="newPinLabel">새 PIN (4~6자리 숫자)</label>
+      <input id="newPin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="••••">
+      <label for="newPin2" id="newPin2Label">새 PIN 확인</label>
+      <input id="newPin2" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="••••">
+      <div class="action-row">
+        <button id="btnSetPin" type="button">새 PIN 저장</button>
+      </div>
+    </div>
+    </div>
 
     <div id="todayInfo"></div>
-    <div class="action-row">
+    <div class="action-row" id="checkActionRow">
       <button id="btnCheckin">체크인</button>
       <button id="btnCheckout">체크아웃</button>
     </div>
@@ -234,6 +251,7 @@
 <script>
   const F05_ENDPOINT = "https://default3c1ae8a05e88491d86c07db19e932c.6d.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/20/workflows/d9257750b2074539855daf89f2d08bad/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=Pg6qPzXSXVvhbL17J7t1KyM0cPav8EhZcDx-HeL9JZc";
   const F05B_ENDPOINT = "https://default3c1ae8a05e88491d86c07db19e932c.6d.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/05/workflows/a40dc018003142799d04d75a7f6b94b8/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=56djoOif5XIICI8L4fmDAIdY3eFqe-2sgeNZvFBGuVU";
+  const F26_ENDPOINT = "https://default3c1ae8a05e88491d86c07db19e932c.6d.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/13/workflows/697e62a81e5d47da8f3aed0d3154a8bc/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=UJ-kvyv5hNfTRdGyxazmjF7jcJiE1Qdo3mBZt5M8unc";
   const F21_ENDPOINT = "https://default3c1ae8a05e88491d86c07db19e932c.6d.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/21/workflows/22293c47cb8f4679b1e12efa0a66a042/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=E8Qs6zBpPPWgxmH_GuDmDk_69GRpif8dDhhoQih4tOo";
 
   // 한/영 번역 사전
@@ -284,6 +302,13 @@
       forgetLink: "다른 사람으로 체크인",
       deviceExpired: "이 폰의 등록이 해제되었습니다. 사번과 PIN으로 다시 체크인하세요.",
       todayIn: (tm) => `오늘 체크인 ${tm} — 퇴근 시 체크아웃하세요`,
+      resetTitle: "새 PIN 설정",
+      resetGuide: "관리자가 PIN을 초기화했습니다. 사용할 새 PIN을 정해 주세요.",
+      newPinLabel: "새 PIN (4~6자리 숫자)",
+      newPin2Label: "새 PIN 확인",
+      btnSetPin: "새 PIN 저장",
+      newPinMismatch: "두 PIN이 서로 다릅니다.",
+      pinSetDone: "새 PIN이 저장되었습니다. 이제 PIN을 입력하고 체크인하세요.",
       todayDone: (a, b) => `✅ 오늘 근무 완료 (${a} ~ ${b})`,
       reasons: {
         not_found: "등록되지 않은 사번입니다.",
@@ -294,6 +319,7 @@
         already_checked_in: "이미 체크인되었습니다.",
         not_checked_in: "체크인 기록이 없습니다.",
         subcontractor: "하청 인원은 QR 체크인을 사용하지 않습니다. 출근부에 서명해 주세요.",
+        reset_not_allowed: "PIN을 새로 설정할 수 없습니다. 관리자에게 PIN 초기화를 다시 요청하세요(초기화 후 24시간 이내).",
         project_not_found: "현장 코드를 확인할 수 없습니다. QR을 다시 스캔하세요."
       }
     },
@@ -343,6 +369,13 @@
       forgetLink: "Check in as someone else",
       deviceExpired: "This phone is no longer registered. Please check in again with your Employee ID and PIN.",
       todayIn: (tm) => `Checked in today at ${tm} — check out when you leave`,
+      resetTitle: "Set a new PIN",
+      resetGuide: "Your administrator reset your PIN. Please choose a new PIN.",
+      newPinLabel: "New PIN (4–6 digits)",
+      newPin2Label: "Confirm new PIN",
+      btnSetPin: "Save new PIN",
+      newPinMismatch: "The two PINs do not match.",
+      pinSetDone: "Your new PIN has been saved. Enter it to check in.",
       todayDone: (a, b) => `✅ Done for today (${a} – ${b})`,
       reasons: {
         not_found: "Employee ID not found.",
@@ -353,6 +386,7 @@
         already_checked_in: "Already checked in.",
         not_checked_in: "No check-in record found.",
         subcontractor: "Subcontractor workers do not use QR check-in. Please sign the attendance sheet.",
+        reset_not_allowed: "You cannot set a new PIN now. Ask your administrator to reset your PIN again (valid for 24 hours).",
         project_not_found: "Project not found. Please rescan the QR code."
       }
     },
@@ -402,6 +436,13 @@
       forgetLink: "Registrar a otra persona",
       deviceExpired: "Este teléfono ya no está registrado. Registre su entrada de nuevo con su número de empleado y PIN.",
       todayIn: (tm) => `Entrada registrada hoy a las ${tm} — registre su salida al irse`,
+      resetTitle: "Establecer un nuevo PIN",
+      resetGuide: "El administrador restableció su PIN. Elija un nuevo PIN.",
+      newPinLabel: "Nuevo PIN (4–6 dígitos)",
+      newPin2Label: "Confirmar nuevo PIN",
+      btnSetPin: "Guardar nuevo PIN",
+      newPinMismatch: "Los dos PIN no coinciden.",
+      pinSetDone: "Su nuevo PIN se guardó. Ingréselo para registrar su entrada.",
       todayDone: (a, b) => `✅ Jornada completa (${a} – ${b})`,
       reasons: {
         not_found: "Número de empleado no registrado.",
@@ -412,6 +453,7 @@
         already_checked_in: "Ya registró su entrada.",
         not_checked_in: "No hay registro de entrada.",
         subcontractor: "El personal subcontratado no usa el registro QR. Firme la hoja de asistencia.",
+        reset_not_allowed: "No puede establecer un nuevo PIN ahora. Pida al administrador que restablezca su PIN de nuevo (válido por 24 horas).",
         project_not_found: "No se encontró la obra. Escanee el código QR de nuevo."
       }
     }
@@ -434,7 +476,8 @@
       name: data.name,
       todayStatus: data.todayStatus || null,
       checkInLocal: data.checkInLocal || "",
-      checkOutLocal: data.checkOutLocal || ""
+      checkOutLocal: data.checkOutLocal || "",
+      pinReset: data.pinReset === true || String(data.pinReset).toLowerCase() === "true"
     };
   }
 
@@ -570,6 +613,59 @@
     return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
   }
 
+  // PIN 본인 재설정(2026-10-06): 관리자 초기화 후 24시간 이내 — F-05b pinReset=true면 새 PIN 입력 화면
+  const pinFieldsEl = document.getElementById("pinFields");
+  const resetBoxEl = document.getElementById("resetBox");
+  const checkActionRowEl = document.getElementById("checkActionRow");
+  const newPinInput = document.getElementById("newPin");
+  const newPin2Input = document.getElementById("newPin2");
+  const btnSetPin = document.getElementById("btnSetPin");
+  function setResetMode(on) {
+    pinFieldsEl.style.display = on ? "none" : "";
+    resetBoxEl.style.display = on ? "block" : "none";
+    checkActionRowEl.style.display = on ? "none" : "";
+    if (!on) { newPinInput.value = ""; newPin2Input.value = ""; }
+  }
+  function renderResetTexts() {
+    const t = translations[currentLang];
+    document.getElementById("resetTitle").textContent = t.resetTitle;
+    document.getElementById("resetGuide").textContent = t.resetGuide;
+    document.getElementById("newPinLabel").textContent = t.newPinLabel;
+    document.getElementById("newPin2Label").textContent = t.newPin2Label;
+    btnSetPin.textContent = t.btnSetPin;
+  }
+  async function submitNewPin() {
+    const t = translations[currentLang];
+    const employeeId = employeeIdInput.value.trim();
+    const p1 = newPinInput.value.trim();
+    const p2 = newPin2Input.value.trim();
+    if (!/^\d{4,6}$/.test(p1)) { showStatus(t.invalidPin, false); return; }
+    if (p1 !== p2) { showStatus(t.newPinMismatch, false); return; }
+    btnSetPin.disabled = true;
+    showStatus(t.processing, true);
+    try {
+      const pinSalt = await generateSalt();
+      const pinHash = await hashPin(p1, pinSalt);
+      const res = await fetch(F26_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ employeeId, pinHash, pinSalt })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setResetMode(false);
+        showStatus(t.pinSetDone, true);
+        document.getElementById("pin").focus();
+      } else {
+        showStatus(translateReason(data.reason), false);
+      }
+    } catch (e) {
+      showStatus(t.networkError, false);
+    } finally {
+      btnSetPin.disabled = false;
+    }
+  }
+
   // 버튼 활성화 = 위치 확인 완료(처리 중 아님) AND 오늘 상태 — 체크인 전: 체크인만, 체크인 후: 체크아웃만, 퇴근 후: 둘 다 비활성
   let buttonsAllowed = false;
   function updateButtons() {
@@ -633,9 +729,11 @@
     renderModeToggle();
     renderDeviceMode();
     renderTodayState();
+    renderResetTexts();
   }
   applyLanguage();
   if (savedDevice) refreshTodayState(savedDevice.employeeId);
+  btnSetPin.addEventListener("click", submitNewPin);
 
   btnForget.addEventListener("click", () => {
     clearDevice();
@@ -693,6 +791,7 @@
     const val = employeeIdInput.value.trim();
     nameConfirm.textContent = "";
     setTodayState(null);
+    setResetMode(false);
     clearTimeout(lookupTimer);
     if (val.length < 3) return;
     if (projectCode) setTodayState("loading");
@@ -703,6 +802,7 @@
       nameConfirm.textContent = worker ? worker.name : "";
       if (worker) setTodayState(worker.todayStatus, worker.checkInLocal, worker.checkOutLocal);
       else setTodayState(null);
+      setResetMode(!!(worker && worker.pinReset));
     }, 500);
   });
 
