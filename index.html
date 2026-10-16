@@ -141,6 +141,12 @@
   #resetGuide { font-size:14px; color:#555; margin-bottom:8px; }
   #todayInfo { display:none; margin:12px 0 0; padding:10px 12px; border-radius:8px; background:#f5f5f5; font-size:15px; text-align:center; }
   #todayInfo.done { background:#e8f5e9; color:#1b5e20; font-weight:600; }
+  #todayInfo.warn { background:#FFF8E1; color:#7a5a00; font-weight:600; }
+  #transferOverlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:1000; align-items:center; justify-content:center; padding:16px; }
+  #transferBox { background:#fff; border-radius:10px; padding:18px; width:100%; max-width:360px; }
+  #transferTitle { font-weight:700; font-size:16px; margin-bottom:6px; }
+  #transferGuide { font-size:14px; color:#555; margin-bottom:10px; line-height:1.5; }
+  #transferErr { color:#B40E22; font-size:13px; min-height:18px; margin-top:6px; }
   .link-btn {
     display: block;
     width: 100%;
@@ -205,6 +211,19 @@
 
     <div id="status" class="status-box"></div>
     <p id="locNote">위치 확인 중...</p>
+  </div>
+
+  <div id="transferOverlay">
+    <div id="transferBox">
+      <div id="transferTitle"></div>
+      <div id="transferGuide"></div>
+      <input id="arrivalTime" type="time">
+      <div id="transferErr"></div>
+      <div class="action-row">
+        <button id="btnTransferCancel" type="button"></button>
+        <button id="btnTransferOk" type="button"></button>
+      </div>
+    </div>
   </div>
 
   <div id="registerView" style="display:none;">
@@ -312,6 +331,13 @@
       newPinMismatch: "두 PIN이 서로 다릅니다.",
       pinSetDone: "새 PIN이 저장되었습니다. 이제 PIN을 입력하고 체크인하세요.",
       todayDone: (a, b) => `✅ 오늘 근무 완료 (${a} ~ ${b})`,
+      otherOpen: (name, tm) => `⚠ ${name}에서 ${tm}에 체크인한 기록이 아직 열려 있습니다.`,
+      confirmTransferIn: (name) => `${name} 체크인 기록이 열려 있습니다.\n지금 시각으로 ${name} 체크아웃 처리하고 이 현장에 체크인할까요?`,
+      transferTitle: (name) => `${name}에서 체크아웃하지 않았습니다.`,
+      transferGuide: "이 현장에 도착한 시간을 선택하세요. 이 시간이 이전 현장 체크아웃 시간과 이 현장 체크인 시간이 됩니다.",
+      transferOk: "확인",
+      transferCancel: "취소",
+      transferBadTime: (a, b) => `${a} ~ ${b} 사이 시간을 선택하세요.`,
       reasons: {
         not_found: "등록되지 않은 사번입니다.",
         locked: "계정이 잠금되었습니다. 관리자에게 문의하세요.",
@@ -322,7 +348,8 @@
         not_checked_in: "체크인 기록이 없습니다.",
         subcontractor: "하청 인원은 QR 체크인을 사용하지 않습니다. 출근부에 서명해 주세요.",
         reset_not_allowed: "PIN을 새로 설정할 수 없습니다. 관리자에게 PIN 초기화를 다시 요청하세요(초기화 후 24시간 이내).",
-        project_not_found: "현장 코드를 확인할 수 없습니다. QR을 다시 스캔하세요."
+        project_not_found: "현장 코드를 확인할 수 없습니다. QR을 다시 스캔하세요.",
+        invalid_arrival: "도착 시간이 올바르지 않습니다. 다시 선택하세요."
       }
     },
     en: {
@@ -380,6 +407,13 @@
       newPinMismatch: "The two PINs do not match.",
       pinSetDone: "Your new PIN has been saved. Enter it to check in.",
       todayDone: (a, b) => `✅ Done for today (${a} – ${b})`,
+      otherOpen: (name, tm) => `⚠ You checked in at ${name} at ${tm} and have not checked out.`,
+      confirmTransferIn: (name) => `Your check-in at ${name} is still open.\nCheck out of ${name} now and check in here?`,
+      transferTitle: (name) => `You did not check out of ${name}.`,
+      transferGuide: "Select the time you arrived at this site. It will be used as your check-out time at the previous site and your check-in time here.",
+      transferOk: "OK",
+      transferCancel: "Cancel",
+      transferBadTime: (a, b) => `Select a time between ${a} and ${b}.`,
       reasons: {
         not_found: "Employee ID not found.",
         locked: "Account locked. Please contact your administrator.",
@@ -390,7 +424,8 @@
         not_checked_in: "No check-in record found.",
         subcontractor: "Subcontractor workers do not use QR check-in. Please sign the attendance sheet.",
         reset_not_allowed: "You cannot set a new PIN now. Ask your administrator to reset your PIN again (valid for 24 hours).",
-        project_not_found: "Project not found. Please rescan the QR code."
+        project_not_found: "Project not found. Please rescan the QR code.",
+        invalid_arrival: "Invalid arrival time. Please select again."
       }
     },
     es: {
@@ -448,6 +483,13 @@
       newPinMismatch: "Los dos PIN no coinciden.",
       pinSetDone: "Su nuevo PIN se guardó. Ingréselo para registrar su entrada.",
       todayDone: (a, b) => `✅ Jornada completa (${a} – ${b})`,
+      otherOpen: (name, tm) => `⚠ Registró su entrada en ${name} a las ${tm} y no ha registrado su salida.`,
+      confirmTransferIn: (name) => `Su entrada en ${name} sigue abierta.\n¿Registrar la salida de ${name} ahora y la entrada aquí?`,
+      transferTitle: (name) => `No registró su salida de ${name}.`,
+      transferGuide: "Seleccione la hora en que llegó a esta obra. Se usará como hora de salida de la obra anterior y hora de entrada aquí.",
+      transferOk: "Aceptar",
+      transferCancel: "Cancelar",
+      transferBadTime: (a, b) => `Seleccione una hora entre ${a} y ${b}.`,
       reasons: {
         not_found: "Número de empleado no registrado.",
         locked: "Cuenta bloqueada. Comuníquese con el administrador.",
@@ -458,7 +500,8 @@
         not_checked_in: "No hay registro de entrada.",
         subcontractor: "El personal subcontratado no usa el registro QR. Firme la hoja de asistencia.",
         reset_not_allowed: "No puede establecer un nuevo PIN ahora. Pida al administrador que restablezca su PIN de nuevo (válido por 24 horas).",
-        project_not_found: "No se encontró la obra. Escanee el código QR de nuevo."
+        project_not_found: "No se encontró la obra. Escanee el código QR de nuevo.",
+        invalid_arrival: "Hora de llegada no válida. Seleccione de nuevo."
       }
     }
   };
@@ -481,6 +524,7 @@
       todayStatus: data.todayStatus || null,
       checkInLocal: data.checkInLocal || "",
       checkOutLocal: data.checkOutLocal || "",
+      openElsewhere: data.openProjectCode ? { code: data.openProjectCode, name: data.openProjectName || data.openProjectCode, inT: data.openCheckInLocal || "" } : null,
       pinReset: data.pinReset === true || String(data.pinReset).toLowerCase() === "true"
     };
   }
@@ -583,8 +627,8 @@
   const todayInfoEl = document.getElementById("todayInfo");
   let todayState = { status: null, inT: "", outT: "" };
   function hhmm(v) { return v ? String(v).slice(-5) : ""; }
-  function setTodayState(status, inT, outT) {
-    todayState = { status: status || null, inT: inT || "", outT: outT || "" };
+  function setTodayState(status, inT, outT, other) {
+    todayState = { status: status || null, inT: inT || "", outT: outT || "", other: other || null };
     renderTodayState();
   }
   function renderTodayState() {
@@ -592,6 +636,12 @@
     const st = projectCode ? todayState.status : null;
     updateButtons();
     todayInfoEl.className = st === "done" ? "done" : "";
+    if (st === "none" && todayState.other) {
+      todayInfoEl.className = "warn";
+      todayInfoEl.textContent = t.otherOpen(todayState.other.name, hhmm(todayState.other.inT));
+      todayInfoEl.style.display = "block";
+      return;
+    }
     if (st === "in") {
       todayInfoEl.textContent = t.todayIn(hhmm(todayState.inT));
       todayInfoEl.style.display = "block";
@@ -607,7 +657,7 @@
     setTodayState("loading");
     try {
       const w = await lookupWorker(employeeId);
-      if (w) setTodayState(w.todayStatus, w.checkInLocal, w.checkOutLocal);
+      if (w) setTodayState(w.todayStatus, w.checkInLocal, w.checkOutLocal, w.openElsewhere);
       else setTodayState(null);
       return w;
     } catch (e) { setTodayState(null); return null; }
@@ -675,7 +725,7 @@
   function updateButtons() {
     const st = projectCode ? todayState.status : null;
     btnCheckin.disabled = !(buttonsAllowed && (st === null || st === "none"));
-    btnCheckout.disabled = !(buttonsAllowed && (st === null || st === "in"));
+    btnCheckout.disabled = !(buttonsAllowed && (st === null || st === "in" || (st === "none" && !!todayState.other)));
   }
   function setButtonsEnabled(enabled) {
     buttonsAllowed = enabled;
@@ -806,7 +856,7 @@
       try { worker = await lookupWorker(val); } catch (e) {}
       if (employeeIdInput.value.trim() !== val) return; // 그 사이 값이 바뀌었으면 무시
       nameConfirm.textContent = worker ? worker.name : "";
-      if (worker) setTodayState(worker.todayStatus, worker.checkInLocal, worker.checkOutLocal);
+      if (worker) setTodayState(worker.todayStatus, worker.checkInLocal, worker.checkOutLocal, worker.openElsewhere);
       else setTodayState(null);
       setResetMode(!!(worker && worker.pinReset));
     }, 500);
@@ -860,6 +910,44 @@
     );
   }
 
+  // 현장 이동 체크아웃: 이 현장 도착 시간 선택 (이전 현장 체크인 시간 초과 ~ 지금)
+  function askArrival(other) {
+    const t = translations[currentLang];
+    const overlay = document.getElementById("transferOverlay");
+    const input = document.getElementById("arrivalTime");
+    const errEl = document.getElementById("transferErr");
+    const btnOk = document.getElementById("btnTransferOk");
+    const btnCancel = document.getElementById("btnTransferCancel");
+    const minT = hhmm(other.inT);
+    const maxT = nowHHMM();
+    document.getElementById("transferTitle").textContent = t.transferTitle(other.name);
+    document.getElementById("transferGuide").textContent = t.transferGuide;
+    btnOk.textContent = t.transferOk;
+    btnCancel.textContent = t.transferCancel;
+    input.min = minT;
+    input.max = maxT;
+    input.value = maxT;
+    errEl.textContent = "";
+    overlay.style.display = "flex";
+    return new Promise((resolve) => {
+      function close(v) {
+        overlay.style.display = "none";
+        btnOk.onclick = null;
+        btnCancel.onclick = null;
+        resolve(v);
+      }
+      btnCancel.onclick = () => close(null);
+      btnOk.onclick = () => {
+        const v = input.value;
+        if (!v || (minT && v <= minT) || v > maxT) {
+          errEl.textContent = t.transferBadTime(minT || "00:00", maxT);
+          return;
+        }
+        close(v);
+      };
+    });
+  }
+
   async function submitCheck(action) {
     const t = translations[currentLang];
     const deviceMode = !!savedDevice;
@@ -873,6 +961,18 @@
     if (!currentPos) {
       showStatus(t.needLocation, false);
       return;
+    }
+
+    // 다른 현장에 열린 체크인 기록이 있을 때 (현장 이동)
+    let arrivalLocal = null;
+    const other = projectCode ? todayState.other : null;
+    if (other && todayState.status === "none") {
+      if (action === "checkin") {
+        if (!confirm(t.confirmTransferIn(other.name))) return;
+      } else {
+        arrivalLocal = await askArrival(other);
+        if (!arrivalLocal) return;
+      }
     }
 
     setButtonsEnabled(false);
@@ -900,6 +1000,7 @@
         lat: currentPos.latitude,
         lng: currentPos.longitude
       };
+      if (arrivalLocal) payload.arrivalLocal = arrivalLocal;
       let newToken = null;
       if (deviceMode) {
         payload.deviceTokenHash = await hashPin(savedDevice.token, worker.salt);
@@ -928,7 +1029,7 @@
         }
         showStatus(`${label}: ${data.workerName || employeeId}${data.isLate ? t.late : ""}`, true);
         if (action === "checkin") setTodayState("in", nowHHMM(), "");
-        else setTodayState("done", todayState.inT, nowHHMM());
+        else setTodayState("done", arrivalLocal || todayState.inT, nowHHMM());
       } else if (deviceMode && (data.reason === "pin_mismatch" || data.reason === "not_found")) {
         clearDevice();
         savedDevice = null;
@@ -936,7 +1037,7 @@
         showStatus(t.deviceExpired, false);
       } else {
         showStatus(translateReason(data.reason), false);
-        if (data.reason === "already_checked_in" || data.reason === "not_checked_in") refreshTodayState(employeeId);
+        if (data.reason === "already_checked_in" || data.reason === "not_checked_in" || data.reason === "invalid_arrival") refreshTodayState(employeeId);
       }
     } catch (e) {
       showStatus(t.networkError, false);
